@@ -1,9 +1,8 @@
 import axios from 'axios';
 
 const envApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-const defaultApiUrl = 'http://localhost:8000';
-
-const apiBaseUrl = envApiUrl || defaultApiUrl;
+const isBrowser = typeof window !== 'undefined';
+const apiBaseUrl = isBrowser ? '' : (envApiUrl || 'http://localhost:8000');
 
 const api = axios.create({
   baseURL: apiBaseUrl,
