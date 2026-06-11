@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import { API_ROUTES } from '@/lib/constants';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { Skeleton } from '@/components/shared/Skeleton';
-import { Search, Users, Activity, Target } from 'lucide-react';
+import { Search, Users, Target, Flame, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface DashboardStats {
@@ -42,77 +42,89 @@ export function StatsCards() {
       title: 'Total Searches',
       value: stats?.total_searches || 0,
       icon: Search,
-      color: 'text-indigo-400',
-      bg: 'bg-indigo-500/10',
+      gradient: 'from-steel/30 via-ocean/20 to-transparent',
+      iconBg: 'bg-steel/20',
+      iconColor: 'text-steel',
+      accent: 'border-l-steel',
     },
     {
       title: 'Total Leads Found',
       value: stats?.total_leads || 0,
       icon: Users,
-      color: 'text-blue-400',
-      bg: 'bg-blue-500/10',
+      gradient: 'from-ice/20 via-steel/15 to-transparent',
+      iconBg: 'bg-ice/15',
+      iconColor: 'text-ice',
+      accent: 'border-l-ice',
     },
     {
       title: 'Hot Leads',
       value: stats?.hot_leads || 0,
-      icon: Target,
-      color: 'text-rose-500',
-      bg: 'bg-rose-500/10',
+      icon: Flame,
+      gradient: 'from-rose-500/15 via-rose-500/5 to-transparent',
+      iconBg: 'bg-rose-500/20',
+      iconColor: 'text-rose-400',
+      accent: 'border-l-rose-500',
     },
     {
       title: 'Warm Leads',
       value: stats?.warm_leads || 0,
-      icon: Activity,
-      color: 'text-amber-500',
-      bg: 'bg-amber-500/10',
+      icon: TrendingUp,
+      gradient: 'from-amber-500/15 via-amber-500/5 to-transparent',
+      iconBg: 'bg-amber-500/20',
+      iconColor: 'text-amber-400',
+      accent: 'border-l-amber-500',
     },
   ];
 
   if (error) {
     return (
-      <div className="p-6 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center">
-        <p className="text-slate-400 text-sm">Unable to load stats right now.</p>
+      <div className="p-6 bg-ocean/20 border border-ocean/40 rounded-2xl flex items-center justify-center">
+        <p className="text-ice/50 text-sm">Unable to load stats right now.</p>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {[1, 2, 3, 4].map((i) => (
-          <GlassCard key={i} className="p-6">
+          <div key={i} className="rounded-2xl bg-ocean/20 border border-ocean/30 p-6">
             <div className="flex items-center justify-between">
-              <Skeleton className="h-12 w-12 rounded-xl" />
+              <Skeleton className="h-12 w-12 rounded-xl bg-steel/10" />
               <div className="space-y-2 text-right">
-                <Skeleton className="h-4 w-24 ml-auto" />
-                <Skeleton className="h-8 w-16 ml-auto" />
+                <Skeleton className="h-3.5 w-24 ml-auto bg-steel/10" />
+                <Skeleton className="h-8 w-16 ml-auto bg-steel/10" />
               </div>
             </div>
-          </GlassCard>
+          </div>
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
       {cards.map((card, idx) => (
         <motion.div
           key={card.title}
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: idx * 0.1 }}
+          transition={{ duration: 0.4, delay: idx * 0.1, ease: 'easeOut' }}
         >
-          <GlassCard hoverEffect className="p-6">
-            <div className="flex items-center justify-between">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${card.bg}`}>
-                <card.icon className={`w-6 h-6 ${card.color}`} />
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-slate-400 mb-1">{card.title}</p>
-                <p className="text-3xl font-bold text-white leading-none">
-                  {card.value.toLocaleString()}
-                </p>
+          <GlassCard hoverEffect className="relative overflow-hidden">
+            <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} pointer-events-none`} />
+            <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${card.accent} opacity-60`} />
+            <div className="relative p-6">
+              <div className="flex items-center justify-between">
+                <div className={`w-12 h-12 rounded-xl ${card.iconBg} flex items-center justify-center ring-1 ring-white/5`}>
+                  <card.icon className={`w-5.5 h-5.5 ${card.iconColor}`} />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold text-ice/50 uppercase tracking-widest mb-1.5">{card.title}</p>
+                  <p className="text-3xl font-extrabold text-offwhite leading-none tracking-tight">
+                    {card.value.toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
           </GlassCard>

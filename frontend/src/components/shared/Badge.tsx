@@ -14,21 +14,21 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variants = {
-    default: 'bg-slate-100 text-slate-700',
-    success: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20',
-    warning: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
-    error: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10',
-    info: 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20',
-    outline: 'bg-white text-slate-600 border border-slate-200',
+    default: 'bg-steel/15 text-ice',
+    success: 'bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20',
+    warning: 'bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20',
+    error: 'bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20',
+    info: 'bg-steel/20 text-ice ring-1 ring-inset ring-steel/30',
+    outline: 'bg-transparent text-ice/60 border border-steel/30',
   };
 
   const dotColors = {
-    default: 'bg-slate-500',
-    success: 'bg-emerald-500',
-    warning: 'bg-amber-500',
-    error: 'bg-red-500',
-    info: 'bg-indigo-500',
-    outline: 'bg-slate-400',
+    default: 'bg-steel',
+    success: 'bg-emerald-400',
+    warning: 'bg-amber-400',
+    error: 'bg-red-400',
+    info: 'bg-steel',
+    outline: 'bg-ice/40',
   };
 
   return (

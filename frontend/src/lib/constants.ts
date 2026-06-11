@@ -1,9 +1,5 @@
 export const API_ROUTES = {
   health: '/api/health',
-  auth: {
-    me: '/api/auth/me',
-    profile: '/api/auth/profile',
-  },
   searches: {
     create: '/api/searches',
     list: '/api/searches',

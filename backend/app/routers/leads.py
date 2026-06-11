@@ -12,8 +12,11 @@ Endpoints:
 
 import csv
 import io
+import logging
 import math
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -38,6 +41,7 @@ async def list_leads(
     lead_category: Optional[str] = Query(None, description="Filter by category (hot/warm/skip)"),
     user_status: Optional[str] = Query(None, description="Filter by user status"),
     is_favorite: Optional[bool] = Query(None, description="Filter favorites only"),
+    search: Optional[str] = Query(None, description="Search business name"),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order (asc/desc)"),
     page: int = Query(1, ge=1),
@@ -60,6 +64,8 @@ async def list_leads(
             count_query = count_query.eq("user_status", user_status)
         if is_favorite is not None:
             count_query = count_query.eq("is_favorite", is_favorite)
+        if search:
+            count_query = count_query.ilike("business_name", f"%{search}%")
 
         count_resp = count_query.execute()
         total = count_resp.count or 0
@@ -75,6 +81,8 @@ async def list_leads(
             data_query = data_query.eq("user_status", user_status)
         if is_favorite is not None:
             data_query = data_query.eq("is_favorite", is_favorite)
+        if search:
+            data_query = data_query.ilike("business_name", f"%{search}%")
 
         # Sort
         desc = sort_order.lower() == "desc"
@@ -105,6 +113,9 @@ async def list_leads(
 async def export_leads_csv(
     search_id: Optional[str] = Query(None, description="Filter by search ID"),
     lead_category: Optional[str] = Query(None),
+    user_status: Optional[str] = Query(None),
+    is_favorite: Optional[bool] = Query(None),
+    search: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
     """Export leads as a CSV file."""
@@ -117,6 +128,12 @@ async def export_leads_csv(
             query = query.eq("search_id", search_id)
         if lead_category:
             query = query.eq("lead_category", lead_category)
+        if user_status:
+            query = query.eq("user_status", user_status)
+        if is_favorite is not None:
+            query = query.eq("is_favorite", is_favorite)
+        if search:
+            query = query.ilike("business_name", f"%{search}%")
 
         query = query.order("created_at", desc=True)
         response = query.execute()
@@ -165,11 +182,28 @@ async def get_lead_detail(
         )
         if not response.data:
             raise HTTPException(status_code=404, detail="Lead not found")
-        return response.data
+
+        lead = response.data
+
+        # Fetch associated website analyses
+        try:
+            analysis_resp = (
+                supabase.table("website_analyses")
+                .select("*")
+                .eq("lead_id", lead_id)
+                .execute()
+            )
+            if analysis_resp.data:
+                lead["website_analyses"] = analysis_resp.data
+        except Exception as e:
+            logger.warning(f"Failed to fetch analysis for lead {lead_id}: {e}")
+
+        return lead
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail="Lead not found")
+        logger.error(f"Error fetching lead {lead_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.patch("/{lead_id}/status")

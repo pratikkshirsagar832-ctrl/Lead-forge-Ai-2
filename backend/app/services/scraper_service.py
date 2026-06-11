@@ -22,17 +22,41 @@ logger = logging.getLogger(__name__)
 def _get_scraper_path() -> str:
     """Resolve the scraper binary path from config."""
     settings = get_settings()
-    path = settings.scraper_binary_path
+    path = settings.gmaps_scraper_path
+    
+    # Convert to Path object for easier handling
+    path_obj = Path(path)
     
     # Check if path exists as-is first
-    if os.path.exists(path):
-        return path
+    if path_obj.exists():
+        return str(path_obj.resolve())
+    
+    # Try relative to current working directory
+    cwd_path = Path.cwd() / path_obj
+    if cwd_path.exists():
+        return str(cwd_path.resolve())
+    
+    # Try relative to the backend directory
+    backend_dir = Path(__file__).parent.parent.parent
+    backend_path = backend_dir / path_obj
+    if backend_path.exists():
+        return str(backend_path.resolve())
     
     # On Windows, try with .exe extension
     if os.name == "nt":
         exe_path = path if str(path).endswith(".exe") else f"{path}.exe"
-        if os.path.exists(exe_path):
-            return exe_path
+        exe_path_obj = Path(exe_path)
+        if exe_path_obj.exists():
+            return str(exe_path_obj.resolve())
+        
+        # Try with .exe in other locations
+        cwd_exe = Path.cwd() / exe_path
+        if cwd_exe.exists():
+            return str(cwd_exe.resolve())
+        
+        backend_exe = backend_dir / exe_path
+        if backend_exe.exists():
+            return str(backend_exe.resolve())
     
     # Return original path and let FileNotFoundError handle it
     return path

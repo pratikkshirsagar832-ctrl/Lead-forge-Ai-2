@@ -2,7 +2,7 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LEAD_CATEGORIES, USER_STATUSES } from '@/lib/constants';
 import { formatNumber, truncate } from '@/lib/utils';
-import { MapPin, Globe, Star, Users, Phone, ChevronRight, Heart } from 'lucide-react';
+import { MapPin, Globe, Star, Phone, ChevronRight, Heart } from 'lucide-react';
 import Link from 'next/link';
 
 interface LeadCardProps {
@@ -13,103 +13,108 @@ interface LeadCardProps {
 
 export function LeadCard({ lead, onToggleFavorite, isUpdatingFav }: LeadCardProps) {
   const leadCatKey = lead.lead_category || 'warm';
-  const categoryConfig = LEAD_CATEGORIES[leadCatKey as keyof typeof LEAD_CATEGORIES] 
+  const categoryConfig = LEAD_CATEGORIES[leadCatKey as keyof typeof LEAD_CATEGORIES]
     || { label: leadCatKey, color: '#94a3b8', bg: '#f1f5f9' };
-    
-  const statusConfig = lead.status
-    ? USER_STATUSES[lead.status as keyof typeof USER_STATUSES]
+
+  const statusConfig = lead.user_status
+    ? USER_STATUSES[lead.user_status as keyof typeof USER_STATUSES]
     : USER_STATUSES.new;
 
+  const scoreColor = lead.website_health_score != null
+    ? lead.website_health_score >= 70 ? 'text-emerald-400'
+      : lead.website_health_score >= 40 ? 'text-amber-400'
+      : 'text-rose-400'
+    : 'text-ice/40';
+
   return (
-    <GlassCard hoverEffect className="flex flex-col group transition-all bg-slate-900 border-white/10 shadow-lg hover:shadow-xl hover:shadow-indigo-500/10 overflow-hidden relative">
-      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+    <GlassCard hoverEffect className="flex flex-col group transition-all overflow-hidden relative">
+      <div className="absolute inset-0 bg-gradient-to-br from-steel/[0.02] to-transparent pointer-events-none" />
       <div className="p-5 flex-1 cursor-default relative z-10">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex gap-2 items-center flex-wrap">
-            {categoryConfig && (
-              <Badge 
-                style={{ backgroundColor: (categoryConfig as any).bg, color: categoryConfig.color }}
-                className="font-bold border-0 shadow-sm"
-              >
-                {categoryConfig.label}
-              </Badge>
-            )}
-            <Badge variant="outline" dot style={{ color: statusConfig.color, borderColor: 'rgba(255,255,255,0.1)' }}>
-              <span style={{ color: statusConfig.color }}>{statusConfig.label}</span>
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex gap-1.5 items-center flex-wrap">
+            <Badge
+              style={{ backgroundColor: (categoryConfig as any).bg, color: categoryConfig.color }}
+              className="font-bold border-0 shadow-sm text-[11px] px-2.5 py-1"
+            >
+              {categoryConfig.label}
             </Badge>
+            {lead.website_health_score != null && (
+              <span className={`text-[11px] font-bold px-2 py-1 rounded-md bg-navy/60 border border-ocean/30 ${scoreColor}`}>
+                {lead.website_health_score}
+              </span>
+            )}
           </div>
-          <button 
+          <button
             onClick={(e) => {
               e.preventDefault();
               onToggleFavorite(lead.id, lead.is_favorite);
             }}
             disabled={isUpdatingFav}
-            className="p-1.5 -mr-1.5 rounded-full hover:bg-white/10 transition-colors text-slate-500 hover:text-rose-400 disabled:opacity-50"
+            className="p-1.5 -mr-1.5 rounded-full hover:bg-steel/15 transition-colors text-ice/30 hover:text-rose-400 disabled:opacity-50"
           >
-            <Heart 
-              className={`w-5 h-5 transition-transform ${lead.is_favorite ? 'fill-rose-500 text-rose-500' : ''} ${isUpdatingFav ? 'scale-90' : 'active:scale-75'}`} 
+            <Heart
+              className={`w-4.5 h-4.5 transition-all ${lead.is_favorite ? 'fill-rose-500 text-rose-500 scale-110' : ''} ${isUpdatingFav ? 'scale-90 opacity-50' : 'active:scale-75'}`}
             />
           </button>
         </div>
 
-        <h3 className="text-lg font-bold text-white mb-2 leading-tight line-clamp-2" title={lead.business_name}>
+        <h3 className="text-base font-bold text-offwhite mb-2.5 leading-snug line-clamp-2 tracking-tight" title={lead.business_name}>
           {lead.business_name || 'Unknown Business'}
         </h3>
-        
-        {/* Rating and Niche */}
-        <div className="flex items-center gap-2 mb-5">
-          <div className="flex items-center gap-1.5 bg-slate-800/50 px-2 py-1 rounded-md border border-white/5">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="font-semibold text-xs text-slate-200">{lead.rating != null ? lead.rating : 'No rating'}</span>
+
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-1 bg-ocean/25 px-2 py-1 rounded-md border border-ocean/20">
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            <span className="font-semibold text-[11px] text-ice/80">{lead.rating != null ? lead.rating : '—'}</span>
             {lead.total_reviews > 0 && (
-              <span className="text-[10px] text-slate-400">({formatNumber(lead.total_reviews)})</span>
+              <span className="text-[10px] text-ice/50">({formatNumber(lead.total_reviews)})</span>
             )}
           </div>
-          <span className="text-[11px] px-2.5 py-1 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 rounded-md font-medium truncate max-w-[140px]" title={lead.category || 'Unknown'}>
+          <span className="text-[10px] px-2 py-1 bg-steel/10 text-ice/60 border border-steel/15 rounded-md font-medium truncate max-w-[130px]" title={lead.category || 'Unknown'}>
             {lead.category || 'Unknown'}
           </span>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {lead.phone && (
-            <div className="flex items-center gap-3 text-sm text-slate-300 group/item">
-              <div className="p-1.5 shrink-0 rounded-md bg-white/5 text-slate-400 group-hover/item:text-indigo-400 transition-colors">
+            <div className="flex items-center gap-2.5 text-sm text-ice/70 group/item">
+              <div className="p-1.5 shrink-0 rounded-lg bg-ocean/25 text-steel/70 group-hover/item:text-ice transition-colors">
                 <Phone className="w-3.5 h-3.5" />
               </div>
-              <span className="font-medium tracking-wide">{lead.phone}</span>
+              <a href={`tel:${lead.phone}`} className="font-medium tracking-wide text-[13px] hover:text-ice transition-colors">{lead.phone}</a>
             </div>
           )}
-          
-          <div className="flex items-center gap-3 text-sm group/item">
-            <div className="p-1.5 shrink-0 rounded-md bg-white/5 text-slate-400 group-hover/item:text-indigo-400 transition-colors">
+
+          <div className="flex items-center gap-2.5 text-sm group/item">
+            <div className="p-1.5 shrink-0 rounded-lg bg-ocean/25 text-steel/70 group-hover/item:text-ice transition-colors">
               <Globe className="w-3.5 h-3.5" />
             </div>
             {lead.website_url ? (
-              <a href={lead.website_url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:text-indigo-300 hover:underline truncate font-medium" onClick={(e) => e.stopPropagation()}>
-                {truncate(lead.website_url.replace(/^https?:\/\/(www\.)?/, ''), 25)}
+              <a href={lead.website_url} target="_blank" rel="noreferrer" className="text-steel hover:text-ice hover:underline truncate font-medium text-[13px]" onClick={(e) => e.stopPropagation()}>
+                {truncate(lead.website_url.replace(/^https?:\/\/(www\.)?/, ''), 22)}
               </a>
             ) : (
-              <span className="text-slate-500 italic text-sm">No website available</span>
+              <span className="text-ice/30 italic text-[13px]">No website</span>
             )}
           </div>
 
           {lead.full_address && (
-            <div className="flex items-start gap-3 text-sm text-slate-400 group/item pt-1">
-              <div className="p-1.5 shrink-0 rounded-md bg-white/5 text-slate-400 group-hover/item:text-indigo-400 transition-colors mt-0.5">
+            <div className="flex items-start gap-2.5 text-sm text-ice/50 group/item">
+              <div className="p-1.5 shrink-0 rounded-lg bg-ocean/25 text-steel/50 group-hover/item:text-ice transition-colors mt-0.5">
                 <MapPin className="w-3.5 h-3.5" />
               </div>
-              <span className="line-clamp-2 leading-snug">{lead.full_address}</span>
+              <span className="line-clamp-2 leading-snug text-[13px]">{lead.full_address}</span>
             </div>
           )}
         </div>
       </div>
-      
-      <Link 
+
+      <Link
         href={`/dashboard/leads/${lead.id}`}
-        className="relative z-10 px-5 py-3.5 border-t border-white/5 bg-slate-900 border-b border-transparent hover:bg-indigo-500/5 flex items-center justify-between text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition-all duration-300"
+        className="relative z-10 px-5 py-3 border-t border-ocean/20 bg-navy/40 hover:bg-steel/10 flex items-center justify-between text-xs font-semibold text-steel hover:text-ice transition-all duration-300 group/link"
       >
-        View Full Profile
-        <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+        <span>View Full Profile</span>
+        <ChevronRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover/link:translate-x-1" />
       </Link>
     </GlassCard>
   );

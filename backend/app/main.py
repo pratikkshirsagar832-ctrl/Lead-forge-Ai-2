@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.database import get_supabase_admin
 
 # Import routers
-from app.routers import auth, search, leads, dashboard, ai
+from app.routers import search, leads, dashboard, ai
 
 # ── Logging ──────────────────────────────────────────────
 logging.basicConfig(
@@ -86,7 +86,6 @@ def create_app() -> FastAPI:
     )
 
     # ── Routers ──────────────────────────────────────────
-    app.include_router(auth.router)
     app.include_router(search.router)
     app.include_router(leads.router)
     app.include_router(dashboard.router)

@@ -16,11 +16,12 @@ export function useLeads() {
       setIsLoading(true);
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.category) params.append('category', filters.category);
+      if (filters.searchId) params.append('search_id', filters.searchId);
+      if (filters.status) params.append('user_status', filters.status);
+      if (filters.category) params.append('lead_category', filters.category);
       if (filters.isFavorite !== null) params.append('is_favorite', String(filters.isFavorite));
-      params.append('skip', String((filters.page - 1) * filters.limit));
-      params.append('limit', String(filters.limit));
+      params.append('page', String(filters.page));
+      params.append('per_page', String(filters.limit));
 
       const { data } = await api.get(`${API_ROUTES.leads.list}?${params.toString()}`);
       setLeads(data.items, data.total);
@@ -36,9 +37,9 @@ export function useLeads() {
     try {
       setIsUpdating((prev) => ({ ...prev, [id]: true }));
       // Optimistic update
-      updateLeadInStore(id, { status });
-      const { data } = await api.patch(API_ROUTES.leads.status(id), { status });
-      updateLeadInStore(id, { status: data.status });
+      updateLeadInStore(id, { user_status: status });
+      const { data } = await api.patch(API_ROUTES.leads.status(id), { user_status: status });
+      updateLeadInStore(id, { user_status: data.user_status });
       showToast('Status updated', 'success');
     } catch (error) {
       // Revert optimism if needed (complex, but simple fetch works too)
@@ -52,8 +53,8 @@ export function useLeads() {
   const updateLeadNotes = async (id: string, notes: string) => {
     try {
       setIsUpdating((prev) => ({ ...prev, [`${id}_notes`]: true }));
-      updateLeadInStore(id, { notes });
-      await api.patch(API_ROUTES.leads.notes(id), { notes });
+      updateLeadInStore(id, { user_notes: notes });
+      await api.patch(API_ROUTES.leads.notes(id), { user_notes: notes });
       showToast('Notes saved', 'success', 2000);
     } catch (error) {
       showToast('Failed to save notes', 'error');
@@ -81,8 +82,9 @@ export function useLeads() {
       setIsExporting(true);
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.category) params.append('category', filters.category);
+      if (filters.searchId) params.append('search_id', filters.searchId);
+      if (filters.status) params.append('user_status', filters.status);
+      if (filters.category) params.append('lead_category', filters.category);
       if (filters.isFavorite !== null) params.append('is_favorite', String(filters.isFavorite));
 
       const response = await api.get(`${API_ROUTES.leads.export}?${params.toString()}`, {

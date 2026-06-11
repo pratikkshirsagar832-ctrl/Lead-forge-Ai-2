@@ -24,8 +24,8 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
 
   const statusConfig = SEARCH_STATUSES[progress.status as keyof typeof SEARCH_STATUSES] || SEARCH_STATUSES.queued;
   const isFinished = ['completed', 'failed', 'cancelled'].includes(progress.status);
-  
-  const totalStages = 5; // queued, scraping, parsing, analyzing, completed
+
+  const totalStages = 5;
   const currentStage = progress.stage || 0;
   const percentage = isFinished ? 100 : Math.max(5, (currentStage / totalStages) * 100);
 
@@ -36,9 +36,7 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
       setLocalElapsed(progress.elapsed_seconds || 0);
       return;
     }
-
     setLocalElapsed(progress.elapsed_seconds || 0);
-
     const interval = setInterval(() => {
       setLocalElapsed((prev) => {
         if (progress.started_at) {
@@ -49,7 +47,6 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
         return prev + 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [progress.started_at, progress.elapsed_seconds, isFinished]);
 
@@ -59,18 +56,17 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className="max-w-3xl mx-auto mt-8 relative"
     >
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl blur opacity-20 animate-pulse" />
-      <div className="relative bg-slate-900 rounded-2xl p-8 border border-white/10 shadow-2xl overflow-hidden">
-        
-        {/* Decorative Background Elements */}
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-steel to-ice rounded-2xl blur opacity-20 animate-pulse" />
+      <div className="relative bg-gradient-to-br from-ocean/50 to-navy rounded-2xl p-8 border border-steel/30 shadow-2xl overflow-hidden">
+
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-steel/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-ocean/20 blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1.5">
-                <h3 className="text-xl font-bold text-white tracking-tight">
+                <h3 className="text-xl font-bold text-offwhite tracking-tight">
                   Search Progress
                 </h3>
                 <Badge variant={
@@ -81,22 +77,21 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
                   {statusConfig.label}
                 </Badge>
               </div>
-              <p className="text-sm text-slate-400 font-medium">{progress.message || 'Initializing pipeline...'}</p>
+              <p className="text-sm text-ice/60 font-medium">{progress.message || 'Initializing pipeline...'}</p>
             </div>
-            
-            <div className="flex items-center gap-2.5 text-sm font-semibold text-slate-300 bg-white/5 border border-white/10 px-4 py-2 rounded-xl backdrop-blur-md shadow-inner">
-              <Clock className="w-4 h-4 text-indigo-400" />
+
+            <div className="flex items-center gap-2.5 text-sm font-semibold text-ice bg-steel/10 border border-steel/20 px-4 py-2 rounded-xl backdrop-blur-md shadow-inner">
+              <Clock className="w-4 h-4 text-steel" />
               <span className="tabular-nums tracking-wider">{formatDuration(localElapsed)}</span>
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden mb-8 shadow-inner border border-white/5">
+          <div className="relative h-2 bg-navy/50 rounded-full overflow-hidden mb-8 shadow-inner border border-ocean/30">
             <motion.div
               className={`absolute top-0 left-0 h-full rounded-full ${
                 progress.status === 'failed' ? 'bg-rose-500' :
-                progress.status === 'cancelled' ? 'bg-slate-600' :
-                'bg-gradient-to-r from-indigo-500 to-purple-500'
+                progress.status === 'cancelled' ? 'bg-ice/30' :
+                'bg-gradient-to-r from-steel to-ice'
               }`}
               initial={{ width: 0 }}
               animate={{ width: `${percentage}%` }}
@@ -108,40 +103,39 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
             </motion.div>
           </div>
 
-          {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white/[0.03] rounded-xl p-5 border border-white-[0.05] hover:bg-white/[0.05] transition-colors relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="bg-steel/[0.03] rounded-xl p-5 border border-steel/10 hover:bg-steel/[0.05] transition-colors relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-steel/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2 opacity-80">
-                  <Search className="w-4 h-4 text-indigo-400" />
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Found</p>
+                  <Search className="w-4 h-4 text-steel" />
+                  <p className="text-xs font-semibold text-ice/60 uppercase tracking-wider">Total Found</p>
                 </div>
-                <p className="text-3xl font-bold text-white tracking-tight">{progress.total_results || 0}</p>
+                <p className="text-3xl font-bold text-offwhite tracking-tight">{progress.total_results || 0}</p>
               </div>
             </div>
-            
-            <div className="bg-white/[0.03] rounded-xl p-5 border border-white-[0.05] hover:bg-white/[0.05] transition-colors relative overflow-hidden group">
+
+            <div className="bg-steel/[0.03] rounded-xl p-5 border border-steel/10 hover:bg-steel/[0.05] transition-colors relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2 opacity-80">
                   <CheckCircle className="w-4 h-4 text-emerald-400" />
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Processed</p>
+                  <p className="text-xs font-semibold text-ice/60 uppercase tracking-wider">Processed</p>
                 </div>
-                <p className="text-3xl font-bold text-white tracking-tight">{progress.processed_count || 0}</p>
+                <p className="text-3xl font-bold text-offwhite tracking-tight">{progress.processed_count || 0}</p>
               </div>
             </div>
 
-            <div className="bg-white/[0.03] rounded-xl p-5 border border-white-[0.05] md:col-span-2 flex items-center justify-between">
+            <div className="bg-steel/[0.03] rounded-xl p-5 border border-steel/10 md:col-span-2 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Current Action</p>
-                <p className="text-sm font-medium text-slate-200 pr-2">
+                <p className="text-xs font-semibold text-ice/60 mb-1.5 uppercase tracking-wider">Current Action</p>
+                <p className="text-sm font-medium text-ice/80 pr-2">
                   {isFinished ? (progress.status === 'completed' ? 'Operations concluded successfully.' : 'Operations halted.') : progress.message || 'Initializing...'}
                 </p>
               </div>
-              <div className="shrink-0 p-3 rounded-full bg-white/5 border border-white/5">
+              <div className="shrink-0 p-3 rounded-full bg-steel/10 border border-steel/20">
                 {!isFinished ? (
-                  <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                  <Loader2 className="w-5 h-5 text-steel animate-spin" />
                 ) : progress.status === 'completed' ? (
                   <CheckCircle className="w-6 h-6 text-emerald-400" />
                 ) : (
@@ -151,37 +145,36 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
             </div>
           </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-3 pt-6 border-t border-white/10 relative z-10">
-          {!isFinished ? (
-            <>
-              {localElapsed > 120 && (
-                <p className="mr-auto text-sm text-amber-400 flex items-center font-medium">
-                  Search operation is processing extensive data...
-                </p>
-              )}
-              <LoadingButton 
-                variant="outline" 
-                onClick={onCancel} 
-                isLoading={isCancelling}
-                className="border-white/20 text-slate-300 hover:text-white hover:bg-white/10"
-              >
-                Cancel Process
-              </LoadingButton>
-            </>
-          ) : (
-            <>
-              {progress.status === 'completed' && (progress.total_results || 0) > 0 && (
-                <Link
-                  href="/dashboard/leads"
-                  className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)]"
+          <div className="flex justify-end gap-3 pt-6 border-t border-ocean/30 relative z-10">
+            {!isFinished ? (
+              <>
+                {localElapsed > 120 && (
+                  <p className="mr-auto text-sm text-amber-400 flex items-center font-medium">
+                    Search operation is processing extensive data...
+                  </p>
+                )}
+                <LoadingButton
+                  variant="outline"
+                  onClick={onCancel}
+                  isLoading={isCancelling}
+                  className="border-steel/30 text-ice hover:text-offwhite hover:bg-steel/10"
                 >
-                  View Leads Dashboard
-                </Link>
-              )}
-            </>
-          )}
-        </div>
+                  Cancel Process
+                </LoadingButton>
+              </>
+            ) : (
+              <>
+                {progress.status === 'completed' && (progress.total_results || 0) > 0 && (
+                  <Link
+                    href="/dashboard/leads"
+                    className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-offwhite bg-gradient-to-r from-steel to-ocean hover:from-steel/90 hover:to-ocean/90 transition-all shadow-[0_0_20px_rgba(74,127,167,0.4)] hover:shadow-[0_0_30px_rgba(74,127,167,0.6)]"
+                  >
+                    View Leads Dashboard
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

@@ -1,242 +1,468 @@
 """
-LeadForge AI — Website Analyzer Service
+LeadForge AI — Website Analyzer Service (Phase 1 Enhanced)
 
-Lightweight homepage analysis using Scrapling.
-Checks SSL, title, meta, content length, contact info, social links.
-Returns a score, category (warm/skip), and issues list.
+Uses Scrapling's AsyncFetcher + Selector for 28+ quality signals.
+Categorizes leads:
+  - hot  (score 0-39)   — bad/no website = great opportunity
+  - warm (score 40-69)  — mediocre website = some opportunity
+  - skip (score 70-100) — good website = low opportunity
+
+Phase 1 enhancements (from SEO-audit + AI-SEO skills):
+  - Heading hierarchy (h1-h6), internal vs external links, language tag
+  - Canonical tag, robots.txt AI-bot detection, GA4/GTM snippets
+  - Schema type identification, Twitter Cards, cookie consent
+  - Image lazy loading, link anchor text ratio, form detection
 """
 
+import asyncio
 import logging
 import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
-import httpx
+from scrapling import AsyncFetcher
 
 logger = logging.getLogger(__name__)
 
-# Minimum acceptable content length (characters)
-MIN_CONTENT_LENGTH = 200
+HOT_MAX = 39
+WARM_MAX = 69
 
 
 async def analyze_website(url: str) -> dict[str, Any]:
-    """
-    Analyze a website's homepage using lightweight heuristics.
-
-    Returns:
-        {
-            "overall_score": int (0-100),
-            "category": "warm" | "skip",
-            "issues": [...],
-            "emails_found": [...],
-            "phones_found": [...],
-            "raw_analysis": {...},
-        }
-    """
     if not url:
         return _empty_result("No website URL provided")
 
-    # Normalize URL
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
 
     issues: list[str] = []
-    raw_analysis: dict[str, Any] = {}
+    raw: dict[str, Any] = {}
     emails_found: list[str] = []
     phones_found: list[str] = []
-    score = 100  # Start at 100, deduct for issues
+    score = 100
+    parsed_url = urlparse(url)
+    base_domain = parsed_url.netloc
 
     try:
-        # Attempt to use Scrapling for page fetching
-        html_content, final_url, used_scrapling = await _fetch_page(url)
+        response = await AsyncFetcher.get(
+            url,
+            timeout=20,
+            follow_redirects=True,
+            impersonate="chrome",
+            stealthy_headers=True,
+        )
 
-        if not html_content:
-            return _empty_result("Could not fetch homepage")
+        if response is None:
+            return _empty_result("No response received")
 
-        raw_analysis["fetched_url"] = final_url
-        raw_analysis["used_scrapling"] = used_scrapling
-        raw_analysis["content_length"] = len(html_content)
+        status = response.status if hasattr(response, "status") else 0
+        if status >= 400:
+            return _empty_result(f"HTTP {status}")
 
-        # ── SSL/HTTPS Check ─────────────────────────────────
-        parsed = urlparse(final_url or url)
-        is_https = parsed.scheme == "https"
-        raw_analysis["is_https"] = is_https
+        raw["status"] = status
+        raw["final_url"] = str(response.url) if hasattr(response, "url") else url
+        raw["content_length"] = len(response.body or b"")
+        raw["page_size_kb"] = round(len(response.body or b"") / 1024, 1)
+
+        # Update base_domain after redirects
+        if hasattr(response, "url"):
+            parsed_url = urlparse(str(response.url))
+            base_domain = parsed_url.netloc
+            url = str(response.url)
+
+        # ── SSL/HTTPS ────────────────────────────────────────────
+        is_https = str(response.url).startswith("https://")
+        raw["is_https"] = is_https
         if not is_https:
-            issues.append("Site does not use HTTPS")
+            issues.append("No HTTPS")
             score -= 15
 
-        # ── Title Check ─────────────────────────────────────
-        title = _extract_tag_content(html_content, "title")
-        raw_analysis["title"] = title
+        # ── Title ────────────────────────────────────────────────
+        title_el = response.css("title::text")
+        title = title_el.get() if title_el else ""
+        raw["title"] = str(title) if title else ""
         if not title:
             issues.append("Missing page title")
             score -= 10
-        elif len(title) < 10:
-            issues.append("Page title is too short")
+        elif len(str(title).strip()) < 10:
+            issues.append("Title too short")
             score -= 5
 
-        # ── Meta Description ────────────────────────────────
-        meta_desc = _extract_meta_description(html_content)
-        raw_analysis["meta_description"] = meta_desc
-        if not meta_desc:
+        # ── Meta description ─────────────────────────────────────
+        meta_el = response.find("meta", {"name": "description"})
+        desc = meta_el.attrib.get("content", "") if meta_el else ""
+        raw["meta_description"] = str(desc) if desc else ""
+        if not desc:
             issues.append("Missing meta description")
             score -= 10
-        elif len(meta_desc) < 50:
-            issues.append("Meta description is too short")
+        elif len(str(desc).strip()) < 50:
+            issues.append("Meta description too short")
             score -= 5
 
-        # ── Content Length ──────────────────────────────────
-        visible_text = _extract_visible_text(html_content)
-        text_length = len(visible_text)
-        raw_analysis["visible_text_length"] = text_length
-        if text_length < MIN_CONTENT_LENGTH:
-            issues.append("Very thin content on homepage")
-            score -= 15
+        # ── LANGUAGE TAG (new - SEO audit skill) ─────────────────
+        html_el = response.find("html")
+        lang = html_el.attrib.get("lang", "") if html_el else ""
+        raw["language"] = lang or ""
+        if not lang:
+            issues.append("Missing HTML lang attribute")
+            score -= 3
 
-        # ── Contact Information ─────────────────────────────
-        emails_found = _extract_emails(html_content)
-        phones_found = _extract_phones(html_content)
-        raw_analysis["emails_count"] = len(emails_found)
-        raw_analysis["phones_count"] = len(phones_found)
+        # ── CANONICAL TAG (new - SEO audit skill) ────────────────
+        canonical_el = response.find("link", {"rel": "canonical"})
+        canonical_href = canonical_el.attrib.get("href", "") if canonical_el else ""
+        raw["canonical_url"] = canonical_href or ""
+        if not canonical_href:
+            issues.append("No canonical tag")
+            score -= 3
+
+        # ── CONTENT LENGTH ───────────────────────────────────────
+        visible_text = str(response.get_all_text(separator=" ", strip=True) or "")
+        text_len = len(visible_text)
+        raw["visible_text_length"] = text_len
+        if text_len < 200:
+            issues.append("Very thin content")
+            score -= 15
+        elif text_len < 500:
+            issues.append("Thin content")
+            score -= 8
+
+        # ── CONTACT INFO ─────────────────────────────────────────
+        full_text = str(response.get_all_text(separator="\n", strip=True) or "")
+        emails_found = _extract_emails(full_text)
+        phones_found = _extract_phones(full_text)
+        raw["emails_count"] = len(emails_found)
+        raw["phones_count"] = len(phones_found)
         if not emails_found and not phones_found:
-            issues.append("No contact information found on homepage")
+            issues.append("No contact info found")
             score -= 10
 
-        # ── Social Presence ─────────────────────────────────
-        social_links = _extract_social_links(html_content)
-        raw_analysis["social_links_count"] = len(social_links)
-        raw_analysis["social_platforms"] = social_links
+        # ── SOCIAL PRESENCE ──────────────────────────────────────
+        social = _extract_social_links(response)
+        raw["social_platforms"] = social
+        raw["social_count"] = len(social)
+        if not social:
+            issues.append("No social media presence")
+            score -= 5
+        elif len(social) >= 3:
+            score += 5
 
-        # ── Weak Quality Signals ────────────────────────────
-        if _is_parked_or_template(html_content, visible_text):
-            issues.append("Site appears to be parked or a default template")
+        # ── PARKED / TEMPLATE ────────────────────────────────────
+        if _is_parked(visible_text):
+            issues.append("Site appears parked or default template")
             score -= 25
 
-        if _has_broken_layout_signals(html_content):
-            issues.append("Possible broken or outdated layout")
+        # ── BROKEN LAYOUT ────────────────────────────────────────
+        html_content = str(
+            getattr(response, 'html_content', None)
+            or getattr(response, 'text', None)
+            or (response.body or b"").decode('utf-8', errors='replace')
+        )
+        html_lower = html_content.lower()
+        if _has_broken_layout(html_lower):
+            issues.append("Outdated or broken layout")
             score -= 10
 
-        # ── Viewport / Mobile ──────────────────────────────
-        has_viewport = 'name="viewport"' in html_content.lower() or "name='viewport'" in html_content.lower()
-        raw_analysis["has_viewport"] = has_viewport
+        # ── MOBILE VIEWPORT ──────────────────────────────────────
+        has_viewport = bool(response.find("meta", {"name": "viewport"}))
+        raw["has_viewport"] = has_viewport
         if not has_viewport:
-            issues.append("No viewport meta tag (not mobile-friendly)")
+            issues.append("Not mobile-friendly (no viewport meta)")
             score -= 10
 
-        # Clamp score
-        score = max(0, min(100, score))
+        # ── FRAMEWORK DETECTION ──────────────────────────────────
+        framework = _detect_framework(html_lower)
+        raw["framework"] = framework
+        if framework == "none":
+            issues.append("No modern CMS/framework detected")
+            score -= 5
+        elif framework in ("wix", "squarespace", "shopify", "webflow"):
+            score += 5
+        elif framework == "wordpress":
+            score += 3
 
-        # Determine category
-        category = "skip" if score >= 50 else "warm"
-        # "warm" = website needs improvement = good lead
-        # "skip" = website is already decent = less opportunity
+        # ── OPEN GRAPH TAGS ──────────────────────────────────────
+        og_tags = response.css('meta[property^="og:"]')
+        og_count = len(og_tags)
+        raw["og_tags_count"] = og_count
+        if og_count < 3:
+            issues.append("Poor social sharing (missing Open Graph tags)")
+            score -= 5
+
+        # ── TWITTER CARDS (new - SEO audit skill) ────────────────
+        twitter_tags = response.css('meta[name^="twitter:"]')
+        raw["twitter_card_count"] = len(twitter_tags)
+        if not twitter_tags:
+            issues.append("No Twitter Card meta tags")
+            score -= 3
+
+        # ── FAVICON ──────────────────────────────────────────────
+        has_favicon = bool(
+            response.css('link[rel="icon"]')
+            or response.css('link[rel="shortcut icon"]')
+            or response.css('link[rel="apple-touch-icon"]')
+        )
+        raw["has_favicon"] = has_favicon
+        if not has_favicon:
+            issues.append("No favicon")
+            score -= 3
+
+        # ── HEADING HIERARCHY (new - SEO audit skill) ───────────
+        headings = {}
+        for tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
+            els = response.css(tag)
+            headings[tag] = len(els)
+        raw["headings"] = headings
+        if headings["h1"] == 0:
+            issues.append("No H1 heading")
+            score -= 5
+        elif headings["h1"] > 1:
+            issues.append(f"Multiple H1 tags ({headings['h1']})")
+            score -= 3
+        if headings["h2"] == 0 and text_len > 500:
+            issues.append("No H2 subheadings despite substantial content")
+            score -= 3
+
+        # ── INTERNAL vs EXTERNAL LINKS (new - SEO audit skill) ──
+        all_links = response.css("a[href]")
+        internal = 0
+        external = 0
+        nofollow = 0
+        for link in all_links:
+            href = link.attrib.get("href", "")
+            rel = (link.attrib.get("rel", "") or "").lower()
+            if href.startswith("#") or href.startswith("javascript:"):
+                continue
+            if "nofollow" in rel:
+                nofollow += 1
+            if href.startswith("/") or href.startswith("?") or base_domain in href:
+                internal += 1
+            elif href.startswith("http"):
+                external += 1
+        total_links = internal + external
+        raw["internal_links"] = internal
+        raw["external_links"] = external
+        raw["nofollow_links"] = nofollow
+        raw["total_links"] = total_links
+        if total_links == 0:
+            issues.append("No internal links found")
+            score -= 5
+        elif external > 0 and external / total_links > 0.5:
+            issues.append("Most links point to external sites")
+            score -= 3
+
+        # ── IMAGES ───────────────────────────────────────────────
+        images = response.css("img[src]")
+        total_imgs = len(images)
+        no_alt = 0
+        lazy_loaded = 0
+        webp = 0
+        for img in images:
+            alt = img.attrib.get("alt", "")
+            if not alt:
+                no_alt += 1
+            loading = img.attrib.get("loading", "")
+            if loading == "lazy":
+                lazy_loaded += 1
+            src = (img.attrib.get("src", "") or "").lower()
+            if ".webp" in src:
+                webp += 1
+        raw["total_images"] = total_imgs
+        raw["images_without_alt"] = no_alt
+        raw["images_lazy_loaded"] = lazy_loaded
+        raw["images_webp"] = webp
+        if total_imgs > 0 and no_alt / total_imgs > 0.5:
+            issues.append("Many images missing alt text")
+            score -= 5
+        if total_imgs > 0 and webp / total_imgs < 0.3:
+            issues.append("Most images not in WebP/AVIF format")
+            score -= 3
+
+        # ── STRUCTURED DATA (schema.org) ─────────────────────────
+        has_schema = bool(
+            response.css('script[type="application/ld+json"]')
+            or response.css('[itemscope]')
+            or response.css('[itemtype]')
+        )
+        schema_types = set()
+        for script in response.css('script[type="application/ld+json"]'):
+            try:
+                text = str(script.get_all_text(strip=True) or "")
+                for mt in re.findall(r'"@type"\s*:\s*"([^"]+)"', text):
+                    schema_types.add(mt)
+            except Exception:
+                pass
+        raw["has_structured_data"] = has_schema
+        raw["schema_types"] = sorted(schema_types)
+        if not has_schema:
+            issues.append("No structured data (schema.org)")
+            score -= 5
+        elif "LocalBusiness" not in schema_types and "Organization" not in schema_types:
+            issues.append("Missing LocalBusiness/Organization schema")
+            score -= 2
+
+        # ── GA4 / GTM DETECTION (new - analytics skill) ─────────
+        has_ga = bool(
+            re.search(r'gtag\s*\(|google-analytics\.com|googletagmanager\.com', html_lower)
+        )
+        raw["has_analytics"] = has_ga
+        if not has_ga:
+            issues.append("No analytics detected (GA4/GTM)")
+            score -= 3
+
+        # ── COOKIE CONSENT (new - analytics skill) ──────────────
+        has_cookie_banner = bool(
+            re.search(
+                r'cookie[-_]?(consent|banner|notice|popup|bar)',
+                html_lower,
+            )
+            or response.css('[class*="cookie"], [id*="cookie"], [class*="CookieConsent"]')
+        )
+        raw["has_cookie_consent"] = has_cookie_banner
+        if not has_cookie_banner:
+            issues.append("No cookie consent banner detected")
+            score -= 2
+
+        # ── FORM DETECTION (new - prospecting skill) ────────────
+        forms = response.css("form")
+        raw["form_count"] = len(forms)
+        if forms:
+            cta_inputs = response.css('button[type="submit"], input[type="submit"]')
+            raw["cta_button_count"] = len(cta_inputs)
+        else:
+            raw["cta_button_count"] = 0
+
+        # ── NAVIGATION ───────────────────────────────────────────
+        has_nav = bool(
+            response.css("nav, header nav, .nav, .navbar, #nav, #navbar")
+        )
+        raw["has_navigation"] = has_nav
+        if not has_nav:
+            issues.append("No visible navigation")
+            score -= 5
+
+        # ── FOOTER ───────────────────────────────────────────────
+        has_footer = bool(response.css("footer, .footer, #footer"))
+        raw["has_footer"] = has_footer
+        if not has_footer:
+            issues.append("No footer found")
+            score -= 3
+
+        # ── PAGE SIZE ────────────────────────────────────────────
+        if raw["page_size_kb"] > 3000:
+            issues.append(f"Very large page ({raw['page_size_kb']:.0f} KB)")
+            score -= 5
+        elif raw["page_size_kb"] < 5:
+            issues.append("Suspiciously small page")
+            score -= 5
+
+        # ── ROBOTS.TXT CHECK (new - AI-SEO skill) ──────────────
+        ai_bots_blocked = []
+        robots_text = ""
+        try:
+            robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
+            robots_resp = await AsyncFetcher.get(
+                robots_url, timeout=8, follow_redirects=False
+            )
+            if robots_resp and robots_resp.status == 200:
+                robots_text = str(
+                    robots_resp.get_all_text(strip=True) or ""
+                ).lower()
+                ai_bots = ["gptbot", "claudebot", "perplexitybot", "google-extended"]
+                for bot in ai_bots:
+                    if "disallow: /" in robots_text and bot in robots_text:
+                        ai_bots_blocked.append(bot)
+                raw["robots_txt_found"] = True
+                raw["robots_ai_bots_blocked"] = ai_bots_blocked
+                if ai_bots_blocked:
+                    issues.append(f"AI crawlers blocked in robots.txt ({', '.join(ai_bots_blocked)})")
+                    score -= 2
+            else:
+                raw["robots_txt_found"] = False
+        except Exception:
+            raw["robots_txt_found"] = False
+
+        # ── SITEMAP DETECTION (new - SEO audit skill) ───────────
+        sitemap_found = False
+        try:
+            sitemap_url = f"{parsed_url.scheme}://{parsed_url.netloc}/sitemap.xml"
+            sitemap_resp = await AsyncFetcher.get(
+                sitemap_url, timeout=6, follow_redirects=False
+            )
+            if sitemap_resp and sitemap_resp.status == 200:
+                sitemap_found = True
+        except Exception:
+            pass
+        if not sitemap_found and "sitemap:" in robots_text:
+            sitemap_found = True
+        raw["sitemap_found"] = sitemap_found
+        if not sitemap_found:
+            issues.append("No XML sitemap detected")
+            score -= 3
+
+        # ── CLAMP & CATEGORIZE ──────────────────────────────────
+        score = max(0, min(100, score + _bonus_from_signals(raw)))
+        raw["final_score"] = score
+
+        if score <= HOT_MAX:
+            category = "hot"
+        elif score <= WARM_MAX:
+            category = "warm"
+        else:
+            category = "skip"
 
         return {
             "overall_score": score,
             "category": category,
             "issues": issues,
-            "emails_found": emails_found[:10],  # Cap at 10
+            "emails_found": emails_found[:10],
             "phones_found": phones_found[:10],
-            "raw_analysis": raw_analysis,
+            "raw_analysis": raw,
         }
 
     except Exception as e:
-        logger.error(f"Website analysis failed for {url}: {e}")
-        return _empty_result(f"Analysis failed: {str(e)}")
+        logger.error(f"Analysis failed for {url}: {e}")
+        return _empty_result(f"Analysis error: {e}")
 
 
-async def _fetch_page(url: str) -> tuple[str, str, bool]:
-    """
-    Fetch page HTML. Tries Scrapling first, falls back to httpx.
-    Returns (html_content, final_url, used_scrapling).
-    """
-    # Try Scrapling first
-    try:
-        from scrapling import Fetcher
-
-        fetcher = Fetcher(auto_match=False)
-        page = fetcher.get(url, timeout=15)
-        if page and page.status == 200:
-            return page.text or str(page.body), str(page.url), True
-    except ImportError:
-        logger.info("Scrapling not installed, falling back to httpx")
-    except Exception as e:
-        logger.warning(f"Scrapling fetch failed for {url}: {e}")
-
-    # Fallback to httpx
-    try:
-        async with httpx.AsyncClient(
-            follow_redirects=True,
-            timeout=15.0,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; LeadForgeBot/1.0)"},
-        ) as client:
-            response = await client.get(url)
-            return response.text, str(response.url), False
-    except Exception as e:
-        logger.error(f"httpx fetch also failed for {url}: {e}")
-        return "", url, False
+def _bonus_from_signals(raw: dict) -> int:
+    bonus = 0
+    if raw.get("has_navigation"): bonus += 2
+    if raw.get("has_footer"): bonus += 1
+    if raw.get("has_viewport"): bonus += 2
+    if raw.get("has_favicon"): bonus += 1
+    if raw.get("has_structured_data"): bonus += 2
+    if raw.get("has_analytics"): bonus += 1
+    if raw.get("sitemap_found"): bonus += 1
+    if raw.get("has_cookie_consent"): bonus += 1
+    if raw.get("canonical_url"): bonus += 1
+    if raw.get("language"): bonus += 1
+    h = raw.get("headings", {})
+    if h.get("h1") == 1: bonus += 2
+    if h.get("h2", 0) >= 3: bonus += 1
+    return bonus
 
 
-def _extract_tag_content(html: str, tag: str) -> str:
-    """Extract text content of the first occurrence of a tag."""
-    pattern = rf"<{tag}[^>]*>(.*?)</{tag}>"
-    match = re.search(pattern, html, re.IGNORECASE | re.DOTALL)
-    return match.group(1).strip() if match else ""
-
-
-def _extract_meta_description(html: str) -> str:
-    """Extract meta description content."""
-    pattern = r'<meta\s+[^>]*name=["\']description["\'][^>]*content=["\']([^"\']*)["\']'
-    match = re.search(pattern, html, re.IGNORECASE)
-    if match:
-        return match.group(1).strip()
-    # Try reverse order (content before name)
-    pattern2 = r'<meta\s+[^>]*content=["\']([^"\']*)["\'][^>]*name=["\']description["\']'
-    match2 = re.search(pattern2, html, re.IGNORECASE)
-    return match2.group(1).strip() if match2 else ""
-
-
-def _extract_visible_text(html: str) -> str:
-    """Strip HTML tags to get approximate visible text."""
-    # Remove script and style blocks
-    text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.IGNORECASE | re.DOTALL)
-    text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.IGNORECASE | re.DOTALL)
-    # Remove HTML tags
-    text = re.sub(r"<[^>]+>", " ", text)
-    # Collapse whitespace
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
-
-def _extract_emails(html: str) -> list[str]:
-    """Extract email addresses from HTML."""
+def _extract_emails(text: str) -> list[str]:
     pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-    emails = re.findall(pattern, html)
-    # Deduplicate and filter common false positives
-    seen = set()
-    result = []
-    for email in emails:
-        lower = email.lower()
-        if lower not in seen and not lower.endswith((".png", ".jpg", ".gif", ".svg", ".css", ".js")):
-            seen.add(lower)
+    seen: set[str] = set()
+    result: list[str] = []
+    for email in re.findall(pattern, text):
+        low = email.lower()
+        if low not in seen and not low.endswith((".png", ".jpg", ".gif", ".svg", ".css", ".js")):
+            seen.add(low)
             result.append(email)
     return result
 
 
-def _extract_phones(html: str) -> list[str]:
-    """Extract phone numbers from HTML."""
-    # Match common phone formats
-    patterns = [
+def _extract_phones(text: str) -> list[str]:
+    phones: list[str] = []
+    for pat in [
         r"(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}",
         r"\+\d{1,3}[-.\s]?\d{4,14}",
-    ]
-    phones = []
-    for pattern in patterns:
-        found = re.findall(pattern, html)
-        phones.extend(found)
-    # Deduplicate
-    seen = set()
-    result = []
+    ]:
+        phones.extend(re.findall(pat, text))
+    seen: set[str] = set()
+    result: list[str] = []
     for phone in phones:
         cleaned = re.sub(r"\D", "", phone)
         if cleaned not in seen and len(cleaned) >= 7:
@@ -245,58 +471,68 @@ def _extract_phones(html: str) -> list[str]:
     return result
 
 
-def _extract_social_links(html: str) -> list[str]:
-    """Find social media platform references."""
-    social_patterns = {
-        "facebook": r"facebook\.com",
-        "twitter": r"(twitter\.com|x\.com)",
-        "instagram": r"instagram\.com",
-        "linkedin": r"linkedin\.com",
-        "youtube": r"youtube\.com",
-        "tiktok": r"tiktok\.com",
+def _extract_social_links(response) -> list[str]:
+    social = {
+        "facebook": 'a[href*="facebook.com"], a[href*="fb.com"]',
+        "twitter": 'a[href*="twitter.com"], a[href*="x.com"]',
+        "instagram": 'a[href*="instagram.com"]',
+        "linkedin": 'a[href*="linkedin.com"]',
+        "youtube": 'a[href*="youtube.com"]',
+        "tiktok": 'a[href*="tiktok.com"]',
+        "pinterest": 'a[href*="pinterest.com"]',
     }
-    found = []
-    for platform, pattern in social_patterns.items():
-        if re.search(pattern, html, re.IGNORECASE):
-            found.append(platform)
+    found: list[str] = []
+    for platform, selector in social.items():
+        try:
+            if response.css(selector):
+                found.append(platform)
+        except Exception:
+            pass
     return found
 
 
-def _is_parked_or_template(html: str, visible_text: str) -> bool:
-    """Detect parked domains or default template sites."""
-    parked_signals = [
-        "domain is for sale",
-        "parked free",
-        "buy this domain",
-        "this domain is for sale",
-        "powered by godaddy",
-        "this page is under construction",
-        "website coming soon",
-        "default web page",
-        "it works!",  # Apache default
-        "welcome to nginx",
+def _is_parked(text: str) -> bool:
+    signals = [
+        "domain is for sale", "parked free", "buy this domain",
+        "this domain is for sale", "powered by godaddy",
+        "this page is under construction", "website coming soon",
+        "default web page", "it works!", "welcome to nginx",
+        "this domain has been registered", "coming soon",
     ]
-    lower_text = visible_text.lower()
-    return any(signal in lower_text for signal in parked_signals)
+    lower = text.lower()
+    return any(s in lower for s in signals)
 
 
-def _has_broken_layout_signals(html: str) -> bool:
-    """Detect signals of a broken or extremely outdated website."""
-    broken_signals = [
-        "<frameset",
-        "<marquee",
-        "frontpage",
-        "dreamweaver",
-    ]
-    lower_html = html.lower()
-    return any(signal in lower_html for signal in broken_signals)
+def _has_broken_layout(html_lower: str) -> bool:
+    return any(s in html_lower for s in ["<frameset", "<marquee"])
+
+
+def _detect_framework(html_lower: str) -> str:
+    if any(s in html_lower for s in ["wp-content", "wp-includes", "/wp-json/"]):
+        return "wordpress"
+    if any(s in html_lower for s in ["wix-static", "wix-builder", "wix.com"]):
+        return "wix"
+    if "squarespace" in html_lower or "static1.squarespace" in html_lower:
+        return "squarespace"
+    if any(s in html_lower for s in ["shopify.com", "/cdn/shop/", "myshopify"]):
+        return "shopify"
+    if "webflow" in html_lower:
+        return "webflow"
+    if any(s in html_lower for s in ["drupal", "Drupal"]):
+        return "drupal"
+    if any(s in html_lower for s in ["joomla", "com_content"]):
+        return "joomla"
+    if any(s in html_lower for s in ["next/js", "__NEXT_DATA__", "next-static"]):
+        return "nextjs"
+    if "__NUXT__" in html_lower:
+        return "nuxt"
+    return "none"
 
 
 def _empty_result(reason: str) -> dict:
-    """Return a default empty analysis result."""
     return {
         "overall_score": 0,
-        "category": "warm",
+        "category": "hot",
         "issues": [reason],
         "emails_found": [],
         "phones_found": [],

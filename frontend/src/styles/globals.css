@@ -1,38 +1,52 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
-/* Custom Tailwind v4 theme variables */
 @theme {
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-navy: #0A1931;
+  --color-ocean: #1A3D63;
+  --color-steel: #4A7FA7;
+  --color-ice: #B3CFE5;
+  --color-offwhite: #F6FAFD;
 
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
+  --color-amber: #F59E0B;
+  --color-amber-dark: #D97706;
+  --color-emerald: #10B981;
+  --color-emerald-dark: #059669;
+  --color-rose: #F43F5E;
+  --color-rose-dark: #E11D48;
+  --color-violet: #8B5CF6;
 
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
+  --animate-glow: glow 4s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 2s ease-in-out infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-shine: shine 3s ease-in-out infinite;
+  --animate-border-glow: borderGlow 3s ease-in-out infinite;
 
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  @keyframes glow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
 
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
 
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
 
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
+  @keyframes shine {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
 
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
+  @keyframes borderGlow {
+    0%, 100% { border-color: rgba(74, 127, 167, 0.3); }
+    50% { border-color: rgba(74, 127, 167, 0.7); }
+  }
 }
 
 @layer base {
@@ -40,65 +54,118 @@
     margin: 0;
     padding: 0;
     min-height: 100%;
-    background: #09090B;
-    color: #ffffff;
+    background: #0A1931;
+    color: #B3CFE5;
+    scroll-behavior: smooth;
   }
 
   body {
-    background: #09090B;
-    color: #ffffff;
+    background: #0A1931;
+    color: #B3CFE5;
   }
 
   * {
     box-sizing: border-box;
-    border-color: var(--color-border);
+    border-color: #1A3D63;
+  }
+
+  ::selection {
+    background: rgba(74, 127, 167, 0.35);
+    color: #F6FAFD;
   }
 
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
- 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
- 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
- 
-    --primary: 246 100% 64%;
-    --primary-foreground: 222.2 47.4% 11.2%;
- 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
- 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
- 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
- 
+    --background: 213 66% 12%;
+    --foreground: 204 49% 80%;
+
+    --card: 210 59% 25%;
+    --card-foreground: 204 49% 80%;
+
+    --popover: 213 66% 12%;
+    --popover-foreground: 204 49% 80%;
+
+    --primary: 205 39% 47%;
+    --primary-foreground: 213 66% 12%;
+
+    --secondary: 210 59% 25%;
+    --secondary-foreground: 204 49% 80%;
+
+    --muted: 210 59% 25%;
+    --muted-foreground: 205 39% 47%;
+
+    --accent: 205 39% 47%;
+    --accent-foreground: 206 56% 97%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 246 100% 64%;
- 
-    --radius: 0.5rem;
+    --destructive-foreground: 206 56% 97%;
+
+    --border: 210 59% 25%;
+    --input: 210 59% 25%;
+    --ring: 205 39% 47%;
+
+    --radius: 0.75rem;
   }
 }
 
-/* Custom scrollbar for webkit */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  background: rgba(74, 127, 167, 0.4);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(74, 127, 167, 0.7);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #F6FAFD 0%, #4A7FA7 50%, #B3CFE5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-gold {
+  background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 50%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow-border {
+  position: relative;
+}
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(74,127,167,0.5), rgba(179,207,229,0.2), rgba(74,127,167,0.5));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(26,61,99,0.4) 0%, rgba(10,25,49,0.6) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(74,127,167,0.25);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(179,207,229,0.06);
+}
+
+.shimmer-overlay {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(179, 207, 229, 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2.5s ease-in-out infinite;
 }

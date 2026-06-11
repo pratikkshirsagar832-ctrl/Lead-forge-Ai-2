@@ -12,6 +12,7 @@ Endpoints:
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 
 from app.database import get_supabase_admin
 from app.middleware.auth_middleware import get_current_user
@@ -160,20 +161,19 @@ async def get_search_status(
             
         row = response.data[0]
         
-        import datetime
         created_dt = None
         if row.get("created_at"):
-            try: created_dt = datetime.datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            try: created_dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
             except: pass
             
         comp_dt = None
         if row.get("completed_at"):
-            try: comp_dt = datetime.datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00"))
+            try: comp_dt = datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00"))
             except: pass
 
         elapsed = 0
         if created_dt:
-            end_time = comp_dt or datetime.datetime.now(datetime.timezone.utc)
+            end_time = comp_dt or datetime.now(timezone.utc)
             elapsed = int((end_time - created_dt).total_seconds())
             
         hot = row.get("hot_leads", 0) or 0
@@ -247,7 +247,6 @@ async def cancel_search_endpoint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cancel search: {str(e)}")
 
-from pydantic import BaseModel
 
 class DebugSearchRequest(BaseModel):
     niche: str

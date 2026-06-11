@@ -1,7 +1,7 @@
 """
 LeadForge AI — AI Pitch Service
 
-Generates professional outreach pitches using DeepSeek API.
+Generates professional outreach pitches using Gemini API.
 On-demand only — not called automatically during search pipeline.
 """
 
@@ -14,33 +14,19 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 
 async def generate_pitch(
     lead: dict[str, Any],
     analysis: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """
-    Generate an outreach pitch for a specific lead.
-
-    Args:
-        lead: Lead data dict (business name, category, website, etc.)
-        analysis: Optional website analysis data for richer context
-
-    Returns:
-        {
-            "pitch": str,
-            "confidence_score": float,
-            "estimated_deal_value": float,
-        }
-    """
     settings = get_settings()
 
-    if not settings.deepseek_api_key:
+    if not settings.gemini_api_key:
         return {
-            "pitch": "AI pitch generation is not configured. Please set DEEPSEEK_API_KEY.",
+            "pitch": "AI pitch generation is not configured. Please set GEMINI_API_KEY.",
             "confidence_score": 0.0,
             "estimated_deal_value": 0.0,
         }
@@ -50,34 +36,37 @@ async def generate_pitch(
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                DEEPSEEK_API_URL,
-                headers={
-                    "Authorization": f"Bearer {settings.deepseek_api_key}",
-                    "Content-Type": "application/json",
-                },
+                f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent",
+                params={"key": settings.gemini_api_key},
+                headers={"Content-Type": "application/json"},
                 json={
-                    "model": DEEPSEEK_MODEL,
-                    "messages": [
+                    "contents": [
                         {
-                            "role": "system",
-                            "content": (
+                            "role": "user",
+                            "parts": [{"text": prompt}],
+                        }
+                    ],
+                    "systemInstruction": {
+                        "parts": [{
+                            "text": (
                                 "You are a professional sales copywriter helping freelance web developers "
                                 "and digital marketing agencies write outreach messages. "
                                 "Write concise, professional, and personalized outreach pitches. "
                                 "Do NOT sound robotic or generic. Use the business details provided. "
                                 "Keep it under 200 words. Include a clear value proposition and call to action."
-                            ),
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 500,
+                            )
+                        }]
+                    },
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 500,
+                    },
                 },
             )
             response.raise_for_status()
             data = response.json()
 
-        pitch_text = data["choices"][0]["message"]["content"].strip()
+        pitch_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         confidence = _calculate_confidence(lead, analysis)
         deal_value = _estimate_deal_value(lead, analysis)
 
@@ -88,7 +77,7 @@ async def generate_pitch(
         }
 
     except httpx.TimeoutException:
-        logger.error("DeepSeek API timeout")
+        logger.error("Gemini API timeout")
         return {
             "pitch": "Pitch generation timed out. Please try again.",
             "confidence_score": 0.0,
@@ -104,7 +93,6 @@ async def generate_pitch(
 
 
 def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
-    """Build the prompt for the AI model."""
     parts = [
         f"Write a professional outreach pitch for this business:\n",
         f"Business Name: {lead.get('business_name', 'Unknown')}",
@@ -125,7 +113,6 @@ def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
     if lead.get("phone"):
         parts.append(f"Phone: {lead['phone']}")
 
-    # Add website analysis context if available
     if analysis:
         issues = analysis.get("issues", [])
         score = analysis.get("overall_score", None)
@@ -149,51 +136,31 @@ def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
 
 
 def _calculate_confidence(lead: dict, analysis: Optional[dict] = None) -> float:
-    """
-    Calculate a confidence score (0.0-1.0) based on available data.
-    Higher score = more likely to convert.
-    """
-    score = 0.5  # Base
-
-    # No website = likely needs one
+    score = 0.5
     if not lead.get("website_url"):
         score += 0.2
-
-    # Has analysis with issues
     if analysis:
         issue_count = len(analysis.get("issues", []))
         if issue_count > 3:
             score += 0.15
         elif issue_count > 1:
             score += 0.1
-
         web_score = analysis.get("overall_score", 50)
         if web_score < 30:
             score += 0.15
         elif web_score < 50:
             score += 0.1
-
-    # Has reviews but low rating
     reviews = lead.get("total_reviews", 0)
     rating = lead.get("rating", 0)
     if reviews > 10 and rating and rating < 4.0:
         score += 0.05
-
-    # Has phone = contactable
     if lead.get("phone"):
         score += 0.05
-
     return min(1.0, round(score, 2))
 
 
 def _estimate_deal_value(lead: dict, analysis: Optional[dict] = None) -> float:
-    """
-    Estimate potential deal value based on business signals.
-    Returns a rough USD value.
-    """
     base_value = 500.0
-
-    # No website = full build opportunity
     if not lead.get("website_url"):
         base_value = 2000.0
     elif analysis:
@@ -202,8 +169,6 @@ def _estimate_deal_value(lead: dict, analysis: Optional[dict] = None) -> float:
             base_value = 1500.0
         elif issue_count > 2:
             base_value = 1000.0
-
-    # Good reviews suggest established business
     reviews = lead.get("total_reviews", 0)
     if reviews > 100:
         base_value *= 1.5
@@ -211,5 +176,4 @@ def _estimate_deal_value(lead: dict, analysis: Optional[dict] = None) -> float:
         base_value *= 1.3
     elif reviews > 20:
         base_value *= 1.1
-
     return round(base_value, 2)

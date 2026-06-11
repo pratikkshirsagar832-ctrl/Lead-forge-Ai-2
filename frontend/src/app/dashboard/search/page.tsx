@@ -8,7 +8,7 @@ import { useSearch } from '@/hooks/useSearch';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
-import { MapPin, Briefcase, SearchIcon, AlertCircle } from 'lucide-react';
+import { MapPin, Briefcase, SearchIcon, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const searchSchema = z.object({
@@ -19,12 +19,12 @@ const searchSchema = z.object({
 type SearchSchema = z.infer<typeof searchSchema>;
 
 export default function SearchPage() {
-  const { 
-    activeSearchId, 
-    progress, 
-    isStarting, 
-    isCancelling, 
-    startSearch, 
+  const {
+    activeSearchId,
+    progress,
+    isStarting,
+    isCancelling,
+    startSearch,
     cancelSearch,
     resumePollingIfActive
   } = useSearch();
@@ -33,7 +33,6 @@ export default function SearchPage() {
     resolver: zodResolver(searchSchema),
   });
 
-  // Resume polling on mount if there's an active ID in store
   useEffect(() => {
     resumePollingIfActive();
   }, [resumePollingIfActive]);
@@ -47,8 +46,8 @@ export default function SearchPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">New Search</h1>
-        <p className="text-slate-400 mt-2">Find and qualify leads instantly from Google Maps.</p>
+        <h1 className="text-3xl font-bold text-offwhite tracking-tight">New Search</h1>
+        <p className="text-ice/60 mt-2">Find and qualify leads instantly from Google Maps.</p>
       </div>
 
       <AnimatePresence mode="wait">
@@ -60,50 +59,50 @@ export default function SearchPage() {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
           >
-            <GlassCard className="p-8 max-w-3xl mx-auto border-slate-800 bg-slate-900/50">
+            <GlassCard className="p-8 max-w-3xl mx-auto border-ocean/40 bg-gradient-to-br from-ocean/30 to-navy">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-sm font-medium text-ice/80 mb-2">
                       Target Niche
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Briefcase className="h-5 w-5 text-slate-400" />
+                        <Briefcase className="h-5 w-5 text-steel" />
                       </div>
                       <input
                         {...register('niche')}
                         type="text"
                         placeholder="e.g. Plumbers, Dentists"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-700 bg-slate-800/50 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-white text-lg placeholder-slate-500"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
                       />
                     </div>
-                    {errors.niche && <p className="text-red-500 text-sm mt-1.5">{errors.niche.message}</p>}
+                    {errors.niche && <p className="text-red-400 text-sm mt-1.5">{errors.niche.message}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <label className="block text-sm font-medium text-ice/80 mb-2">
                       Location
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MapPin className="h-5 w-5 text-slate-400" />
+                        <MapPin className="h-5 w-5 text-steel" />
                       </div>
                       <input
                         {...register('location')}
                         type="text"
                         placeholder="e.g. Dallas TX, London UK"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-700 bg-slate-800/50 focus:bg-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-white text-lg placeholder-slate-500"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
                       />
                     </div>
-                    {errors.location && <p className="text-red-500 text-sm mt-1.5">{errors.location.message}</p>}
+                    {errors.location && <p className="text-red-400 text-sm mt-1.5">{errors.location.message}</p>}
                   </div>
                 </div>
 
-                <div className="bg-indigo-500/10 p-4 rounded-xl border border-indigo-500/20 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                  <p className="text-sm text-indigo-200 leading-relaxed">
-                    LeadForge will scrape Google Maps for <span className="font-semibold px-1 text-indigo-100">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
+                <div className="bg-steel/10 p-4 rounded-xl border border-steel/20 flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-steel shrink-0 mt-0.5" />
+                  <p className="text-sm text-ice/80 leading-relaxed">
+                    LeadForge will scrape Google Maps for <span className="font-semibold px-1 text-offwhite">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
                   </p>
                 </div>
 
@@ -113,7 +112,8 @@ export default function SearchPage() {
                     isLoading={isStarting}
                     size="lg"
                     fullWidth
-                    className="text-lg py-4 shadow-xl shadow-indigo-600/20"
+                    variant="gradient"
+                    className="text-lg py-4"
                   >
                     <SearchIcon className="w-5 h-5" />
                     Start Search Pipeline
@@ -121,8 +121,7 @@ export default function SearchPage() {
                 </div>
               </form>
             </GlassCard>
-            
-            {/* Show recent completed/failed search progress if just finished */}
+
             {progress && (
               <SearchProgressCard onCancel={cancelSearch} isCancelling={isCancelling} />
             )}
