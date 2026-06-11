@@ -48,7 +48,6 @@ async def analyze_website(url: str) -> dict[str, Any]:
             url,
             timeout=20,
             follow_redirects=True,
-            impersonate="chrome",
             stealthy_headers=True,
         )
 
