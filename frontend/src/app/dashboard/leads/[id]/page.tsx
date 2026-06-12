@@ -10,6 +10,7 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Skeleton } from '@/components/shared/Skeleton';
+import { ScoreBreakdown } from '@/components/dashboard/ScoreBreakdown';
 import {
   ArrowLeft, MapPin, Phone, Globe, Star,
   MessageSquare, FileText, ExternalLink, Activity
@@ -258,37 +259,24 @@ export default function LeadDetailPage() {
           </GlassCard>
 
           {lead.website_analyses && lead.website_analyses.length > 0 && (
-            <GlassCard className="p-6">
-              <h3 className="text-lg font-bold text-offwhite flex items-center gap-2 mb-4">
-                <Activity className="w-5 h-5 text-steel" />
-                Website Analysis
-              </h3>
+            lead.website_analyses.map((analysis: any, idx: number) => {
+              const breakdown = analysis.raw_analysis?.score_breakdown;
+              const score = analysis.overall_score ?? 100;
+              const isSkip = score >= 70;
 
-              {lead.website_analyses.map((analysis: any, idx: number) => (
-                <div key={idx} className="space-y-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-ice/70">Health Score</span>
-                    <span className={`text-lg font-bold ${analysis.overall_score >= 70 ? 'text-emerald-400' : analysis.overall_score >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>
-                      {analysis.overall_score}/100
-                    </span>
-                  </div>
+              if (breakdown && !isSkip) {
+                return (
+                  <ScoreBreakdown
+                    key={idx}
+                    score={score}
+                    category={lead.lead_category}
+                    breakdown={breakdown}
+                  />
+                );
+              }
 
-                  {analysis.issues && analysis.issues.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-ice/60">Identified Issues</p>
-                      <ul className="space-y-2">
-                        {analysis.issues.map((issue: string, i: number) => (
-                          <li key={i} className="flex gap-2 text-sm text-ice/80 bg-rose-500/5 p-2 rounded-lg border border-rose-500/20">
-                            <span className="text-rose-400 shrink-0 mt-0.5">•</span>
-                            <span className="leading-tight">{issue}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </GlassCard>
+              return null;
+            })
           )}
         </div>
       </div>
