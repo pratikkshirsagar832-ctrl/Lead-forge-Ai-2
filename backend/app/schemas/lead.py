@@ -27,6 +27,18 @@ class LeadListItem(BaseModel):
     created_at: Optional[datetime] = None
 
 
+class WebsiteAnalysis(BaseModel):
+    """Website analysis attached to a lead."""
+    id: Optional[str] = None
+    lead_id: Optional[str] = None
+    overall_score: int = 0
+    issues: list[Any] = []
+    emails_found: list[str] = []
+    phones_found: list[str] = []
+    raw_analysis: dict[str, Any] = {}
+    created_at: Optional[datetime] = None
+
+
 class LeadDetail(BaseModel):
     """Full lead detail with all fields."""
     id: str
@@ -54,6 +66,7 @@ class LeadDetail(BaseModel):
     user_notes: str = ""
     is_favorite: bool = False
     created_at: Optional[datetime] = None
+    website_analyses: list[WebsiteAnalysis] = []
 
 
 class LeadStatusUpdate(BaseModel):
