@@ -37,7 +37,8 @@ export default function BillingPage() {
       setSubscription(subResp.data);
       setPlans(plansResp.data?.plans || []);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load billing data');
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : detail?.message || 'Failed to load billing data');
     } finally {
       setIsLoading(false);
     }

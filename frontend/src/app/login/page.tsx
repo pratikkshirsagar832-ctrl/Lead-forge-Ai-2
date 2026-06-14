@@ -143,8 +143,8 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className={`text-sm text-center ${error.includes('Check your email') ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {error}
+            <p className={`text-sm text-center ${String(error).includes('Check your email') ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {String(error)}
             </p>
           )}
 

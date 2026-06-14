@@ -44,7 +44,7 @@ export default function AuthCallbackPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-navy font-sans">
         <div className="text-center">
-          <p className="text-rose-400 mb-4">{error}</p>
+           <p className="text-rose-400 mb-4">{String(error)}</p>
           <button
             onClick={() => router.push('/login')}
             className="px-6 py-2 rounded-lg bg-steel text-offwhite font-semibold hover:opacity-90 transition-opacity"
