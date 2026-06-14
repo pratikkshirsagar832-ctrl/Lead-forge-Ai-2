@@ -59,8 +59,8 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
           <p className="text-xs text-ice/50">How it&apos;s calculated</p>
           <p className="text-sm font-mono text-ice/70 mt-1 leading-relaxed">
             <span className="text-offwhite">100</span>
-            <span className="text-rose-400"> {breakdown.deduction_total}</span>
-            <span className="text-emerald-400"> +{breakdown.bonus_total}</span>
+            <span className="text-rose-400"> - {Math.abs(breakdown.deduction_total)}</span>
+            <span className="text-emerald-400"> + {breakdown.bonus_total}</span>
             <span className="text-offwhite"> = {score}</span>
           </p>
         </div>
@@ -71,7 +71,7 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
         <div className="mb-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-rose-400/80 mb-3 flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5" />
-            Deductions ({breakdown.deductions.length})
+            Problems ({breakdown.deductions.length})
           </p>
           <div className="space-y-1.5">
             {breakdown.deductions.map((item, i) => {
@@ -105,8 +105,8 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
       {breakdown.bonuses.length > 0 && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400/80 mb-3 flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5" />
-            Bonuses ({breakdown.bonuses.length})
+            <CheckCircle className="w-3.5 h-3.5" />
+            What&apos;s Already Fixed ({breakdown.bonuses.length})
           </p>
           <div className="space-y-1.5">
             {breakdown.bonuses.map((item, i) => (

@@ -26,7 +26,7 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_MODEL = "gemini-2.0-flash-lite"
 BATCH_SIZE = 5
 
 SYSTEM_PROMPT = """You are a senior website quality auditor and SEO specialist. Your job is to analyze website data extracted from live pages and provide deep, actionable assessments.
