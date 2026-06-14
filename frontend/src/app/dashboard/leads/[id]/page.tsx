@@ -71,7 +71,8 @@ export default function LeadDetailPage() {
       setLead({ ...lead, ai_pitch: data.pitch });
       showToast('AI Pitch generated successfully!', 'success');
     } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to generate pitch', 'error');
+      const detail = error.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : detail?.message || 'Failed to generate pitch', 'error');
     } finally {
       setIsGeneratingPitch(false);
     }
@@ -95,7 +96,8 @@ export default function LeadDetailPage() {
       // Auto-generate website message after analysis
       handleGenerateWebsiteMessage();
     } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to analyze website', 'error');
+      const detail = error.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : detail?.message || 'Failed to analyze website', 'error');
     } finally {
       setIsAnalyzingWebsite(false);
     }
@@ -108,7 +110,8 @@ export default function LeadDetailPage() {
       setWebsiteMessage(data.message);
       showToast('Outreach message generated!', 'success');
     } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to generate message', 'error');
+      const detail = error.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : detail?.message || 'Failed to generate message', 'error');
     } finally {
       setIsGeneratingMessage(false);
     }

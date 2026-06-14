@@ -93,7 +93,8 @@ export default function BillingPage() {
             setSuccess(`Upgraded to ${plan.name} plan successfully!`);
             loadData();
           } catch (err: any) {
-            setError(err.response?.data?.detail || 'Payment verification failed');
+            const detail = err.response?.data?.detail;
+            setError(typeof detail === 'string' ? detail : detail?.message || 'Payment verification failed');
           } finally {
             setIsProcessing(false);
           }
@@ -110,7 +111,8 @@ export default function BillingPage() {
       });
       rzp.open();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to start upgrade');
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : detail?.message || 'Failed to start upgrade');
       setIsProcessing(false);
     }
   };
