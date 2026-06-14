@@ -109,7 +109,8 @@ export function useSearch() {
       pollResults(data.id);
       return data;
     } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to start search', 'error');
+      const detail = error.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : detail?.message || 'Failed to start search', 'error');
       throw error;
     } finally {
       setIsStarting(false);
@@ -125,7 +126,8 @@ export function useSearch() {
       showToast('Search cancellation requested', 'info');
       pollStatus(activeSearchId);
     } catch (error: any) {
-      showToast(error.response?.data?.detail || 'Failed to cancel search', 'error');
+      const detail = error.response?.data?.detail;
+      showToast(typeof detail === 'string' ? detail : detail?.message || 'Failed to cancel search', 'error');
     } finally {
       setIsCancelling(false);
     }
