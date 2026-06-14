@@ -62,10 +62,10 @@ export function Hero() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Link
-              href="/dashboard"
+              href="/login"
               className="group w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-cta to-cta-light text-white rounded-xl font-semibold text-lg hover:shadow-xl hover:shadow-cta/25 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 flex items-center justify-center gap-2"
             >
-              Go to Dashboard <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              Get Started Free <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
               href="#features"

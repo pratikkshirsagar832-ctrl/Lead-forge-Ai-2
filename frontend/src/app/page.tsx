@@ -27,15 +27,16 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-ice/70">
             <Link href="#features" className="hover:text-offwhite transition-colors duration-200">Features</Link>
             <Link href="#how-it-works" className="hover:text-offwhite transition-colors duration-200">How it Works</Link>
+            <Link href="/pricing" className="hover:text-offwhite transition-colors duration-200">Pricing</Link>
           </nav>
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <Link
-              href="/dashboard"
+              href="/login"
               className="text-sm font-medium bg-gradient-to-r from-cta to-cta-light text-white px-5 py-2.5 rounded-lg hover:shadow-lg hover:shadow-cta/20 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
             >
-              Dashboard
+              Try It Free
             </Link>
           </div>
         </div>
