@@ -25,6 +25,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         }
 
         setIsAuthenticated(true);
+        setIsLoading(false);
       } catch {
         if (mounted) router.replace('/login');
       } finally {
@@ -35,11 +36,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         if (!mounted) return;
-        if (!session) {
+        if (event === 'SIGNED_OUT') {
           router.replace('/login');
-        } else {
+        } else if (session) {
           setIsAuthenticated(true);
           setIsLoading(false);
         }
