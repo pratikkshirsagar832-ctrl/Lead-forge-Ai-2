@@ -177,3 +177,124 @@ def _estimate_deal_value(lead: dict, analysis: Optional[dict] = None) -> float:
     elif reviews > 20:
         base_value *= 1.1
     return round(base_value, 2)
+
+
+async def generate_website_message(
+    lead: dict[str, Any],
+    analysis: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    settings = get_settings()
+
+    if not settings.gemini_api_key:
+        return {
+            "message": (
+                f"Hi {lead.get('business_name', 'there')}! "
+                f"I noticed your website could use some improvements. "
+                f"Would you be open to a quick chat about how I can help?"
+            ),
+        }
+
+    prompt = _build_website_message_prompt(lead, analysis)
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent",
+                params={"key": settings.gemini_api_key},
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [{"text": prompt}],
+                        }
+                    ],
+                    "systemInstruction": {
+                        "parts": [{
+                            "text": (
+                                "You are a professional web consultant reaching out to business owners. "
+                                "Write a short, personalized WhatsApp message that mentions specific issues "
+                                "found on their website. Keep it under 120 words. Friendly but professional. "
+                                "Include a clear call to action. Do NOT use markdown. Do NOT use emojis. "
+                                "Write in plain text suitable for WhatsApp."
+                            )
+                        }]
+                    },
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 300,
+                    },
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        message_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        return {"message": message_text}
+
+    except httpx.TimeoutException:
+        logger.error("Gemini API timeout for website message")
+        return {
+            "message": (
+                f"Hi {lead.get('business_name', 'there')}! "
+                f"I recently reviewed your website and noticed a few areas "
+                f"that could be improved. Would you be open to a quick chat?"
+            ),
+        }
+    except Exception as e:
+        logger.error(f"Website message generation failed: {e}")
+        return {
+            "message": (
+                f"Hi {lead.get('business_name', 'there')}! "
+                f"I can help improve your online presence. "
+                f"Would you be open to a quick conversation?"
+            ),
+        }
+
+
+def _build_website_message_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
+    parts = [
+        f"Write a short WhatsApp outreach message for this business:\n",
+        f"Business Name: {lead.get('business_name', 'Unknown')}",
+        f"Category: {lead.get('category', 'N/A')}",
+    ]
+
+    if lead.get("full_address"):
+        parts.append(f"Location: {lead['full_address']}")
+
+    if lead.get("website_url"):
+        parts.append(f"Website: {lead['website_url']}")
+    else:
+        parts.append("Website: No website found — they need one built")
+
+    if lead.get("phone"):
+        parts.append(f"Phone: {lead['phone']}")
+
+    if analysis:
+        score = analysis.get("overall_score", 0)
+        parts.append(f"Website Health Score: {score}/100")
+        issues = analysis.get("issues", [])
+        if issues:
+            parts.append("Website Issues Found:")
+            for issue in issues[:4]:
+                parts.append(f"  - {issue}")
+        raw = analysis.get("raw_analysis", {})
+        breakdown = raw.get("score_breakdown", {})
+        if breakdown:
+            deductions = breakdown.get("deductions", [])
+            criticals = [d for d in deductions if d.get("severity") == "critical"]
+            if criticals:
+                parts.append("Critical Issues:")
+                for c in criticals[:3]:
+                    parts.append(f"  - {c.get('reason', '')}")
+
+    parts.append(
+        "\nWrite a short WhatsApp message that:"
+        "\n- Greets them by business name"
+        "\n- Mentions 1-2 specific issues found on their website"
+        "\n- Offers your help in a friendly, non-pushy way"
+        "\n- Has a clear call to action (reply or call)"
+        "\n- Is under 120 words, plain text, no markdown, no emojis"
+    )
+
+    return "\n".join(parts)

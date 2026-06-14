@@ -21,6 +21,7 @@ export const API_ROUTES = {
   },
   ai: {
     pitch: (leadId: string) => `/api/ai/pitch/${leadId}`,
+    websiteMessage: (leadId: string) => `/api/ai/website-message/${leadId}`,
   },
 } as const;
 

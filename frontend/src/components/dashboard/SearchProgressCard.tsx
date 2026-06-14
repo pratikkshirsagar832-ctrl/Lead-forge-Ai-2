@@ -37,15 +37,15 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
       return;
     }
     setLocalElapsed(progress.elapsed_seconds || 0);
+    const startedAt = progress.started_at;
     const interval = setInterval(() => {
-      setLocalElapsed((prev) => {
-        if (progress.started_at) {
-          const start = new Date(progress.started_at).getTime();
-          const now = Date.now();
-          return Math.max(0, Math.floor((now - start) / 1000));
-        }
-        return prev + 1;
-      });
+      if (startedAt) {
+        const start = new Date(startedAt).getTime();
+        const now = Date.now();
+        setLocalElapsed(Math.max(0, Math.floor((now - start) / 1000)));
+      } else {
+        setLocalElapsed((prev) => prev + 1);
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [progress.started_at, progress.elapsed_seconds, isFinished]);

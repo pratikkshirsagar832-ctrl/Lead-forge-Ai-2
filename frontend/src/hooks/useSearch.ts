@@ -5,19 +5,41 @@ import { useSearchStore } from '@/stores/searchStore';
 import { useToast } from './useToast';
 
 export function useSearch() {
-  const { activeSearchId, progress, setActiveSearch, setProgress, clearActiveSearch, setHistory } = useSearchStore();
+  const { activeSearchId, progress, setActiveSearch, setProgress, clearActiveSearch, setHistory, appendResults, results, resultsTotal } = useSearchStore();
   const { showToast } = useToast();
   const [isStarting, setIsStarting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resultsPollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resultsPageRef = useRef(1);
 
   const clearPolling = () => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
       pollTimerRef.current = null;
     }
+    if (resultsPollTimerRef.current) {
+      clearTimeout(resultsPollTimerRef.current);
+      resultsPollTimerRef.current = null;
+    }
   };
+
+  const pollResults = useCallback(async (id: string) => {
+    try {
+      const page = resultsPageRef.current;
+      const { data } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=${page}&per_page=4`);
+      if (data.items?.length > 0) {
+        appendResults(data.items);
+      }
+      if (data.total > resultsPageRef.current * 4) {
+        resultsPageRef.current += 1;
+      }
+      resultsPollTimerRef.current = setTimeout(() => pollResults(id), 4000);
+    } catch (error) {
+      resultsPollTimerRef.current = setTimeout(() => pollResults(id), 4000);
+    }
+  }, [appendResults]);
 
   const pollStatus = useCallback(async (id: string) => {
     try {
@@ -26,6 +48,13 @@ export function useSearch() {
 
       if (['completed', 'failed', 'cancelled'].includes(data.status)) {
         clearPolling();
+        // One final results poll
+        try {
+          const { data: finalResults } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=1&per_page=50`);
+          if (finalResults.items) {
+            appendResults(finalResults.items);
+          }
+        } catch {}
         if (data.status === 'completed') {
           showToast(`Search completed: ${data.total_results || 0} leads found.`, 'success');
         } else if (data.status === 'failed') {
@@ -34,7 +63,6 @@ export function useSearch() {
           showToast('Search cancelled', 'info');
         }
       } else {
-        // Continue polling
         pollTimerRef.current = setTimeout(() => pollStatus(id), POLLING_INTERVAL);
       }
     } catch (error: any) {
@@ -47,24 +75,24 @@ export function useSearch() {
       }
       if (error.response?.status === 401 || error.response?.status === 403) {
         clearPolling();
-        return; // interception redirect handles the rest
+        return;
       }
-      // Keep polling despite network blips unless we get a 404/401
       pollTimerRef.current = setTimeout(() => pollStatus(id), POLLING_INTERVAL);
     }
-  }, [setProgress, showToast, clearActiveSearch]);
+  }, [setProgress, showToast, clearActiveSearch, appendResults]);
 
   const startSearch = async (niche: string, location: string) => {
     try {
       setIsStarting(true);
       clearPolling();
+      resultsPageRef.current = 1;
       const { data } = await api.post(API_ROUTES.searches.create, { niche, location });
       setActiveSearch(data.id);
       setProgress({ status: 'queued', stage: 0, elapsed_seconds: 0 });
       showToast('Search started successfully', 'success');
       
-      // Start polling immediately
       pollStatus(data.id);
+      pollResults(data.id);
       return data;
     } catch (error: any) {
       showToast(error.response?.data?.detail || 'Failed to start search', 'error');
@@ -78,10 +106,9 @@ export function useSearch() {
     if (!activeSearchId) return;
     try {
       setIsCancelling(true);
-      await api.post(API_ROUTES.searches.cancel(activeSearchId));
       clearPolling();
+      await api.post(API_ROUTES.searches.cancel(activeSearchId));
       showToast('Search cancellation requested', 'info');
-      // Final poll to get the cancelled status
       pollStatus(activeSearchId);
     } catch (error: any) {
       showToast(error.response?.data?.detail || 'Failed to cancel search', 'error');
@@ -106,13 +133,17 @@ export function useSearch() {
   const resumePollingIfActive = useCallback(() => {
     if (activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status)) {
       clearPolling();
+      resultsPageRef.current = 1;
       pollStatus(activeSearchId);
+      pollResults(activeSearchId);
     }
-  }, [activeSearchId, progress, pollStatus]);
+  }, [activeSearchId, progress, pollStatus, pollResults]);
 
   return {
     activeSearchId,
     progress,
+    results,
+    resultsTotal,
     isStarting,
     isCancelling,
     isFetchingHistory,

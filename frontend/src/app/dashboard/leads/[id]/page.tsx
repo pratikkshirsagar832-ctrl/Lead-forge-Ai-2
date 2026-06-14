@@ -11,10 +11,11 @@ import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Skeleton } from '@/components/shared/Skeleton';
 import { ScoreBreakdown } from '@/components/dashboard/ScoreBreakdown';
+import { DeepAnalysisReport } from '@/components/dashboard/DeepAnalysisReport';
 import {
   ArrowLeft, MapPin, Phone, Globe, Star,
-  MessageSquare, FileText, ExternalLink, Activity,
-  Loader2, CheckCircle2, Target
+  MessageSquare, FileText, ExternalLink,
+  Loader2, CheckCircle2, Target, Send
 } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -30,6 +31,8 @@ export default function LeadDetailPage() {
   const [isGeneratingPitch, setIsGeneratingPitch] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isAnalyzingWebsite, setIsAnalyzingWebsite] = useState(false);
+  const [websiteMessage, setWebsiteMessage] = useState<string | null>(null);
+  const [isGeneratingMessage, setIsGeneratingMessage] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,11 +92,38 @@ export default function LeadDetailPage() {
         lead_category: data.data.category,
       }));
       showToast('Website analysis complete!', 'success');
+      // Auto-generate website message after analysis
+      handleGenerateWebsiteMessage();
     } catch (error: any) {
       showToast(error.response?.data?.detail || 'Failed to analyze website', 'error');
     } finally {
       setIsAnalyzingWebsite(false);
     }
+  };
+
+  const handleGenerateWebsiteMessage = async () => {
+    try {
+      setIsGeneratingMessage(true);
+      const { data } = await api.post(API_ROUTES.ai.websiteMessage(id as string));
+      setWebsiteMessage(data.message);
+      showToast('Outreach message generated!', 'success');
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to generate message', 'error');
+    } finally {
+      setIsGeneratingMessage(false);
+    }
+  };
+
+  const handleWhatsAppSend = () => {
+    if (!websiteMessage) return;
+    const phone = lead?.phone;
+    if (!phone) {
+      showToast('No phone number available for this lead', 'error');
+      return;
+    }
+    const cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(websiteMessage)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   if (isPageLoading) {
@@ -285,20 +315,77 @@ export default function LeadDetailPage() {
           {/* Website Analysis Section */}
           {lead.website_url ? (
             lead.website_analyses && lead.website_analyses.length > 0 ? (
-              lead.website_analyses.map((analysis: any, idx: number) => {
-                const breakdown = analysis.raw_analysis?.score_breakdown;
-                if (breakdown) {
+              <>
+                {lead.website_analyses.map((analysis: any, idx: number) => {
+                  const breakdown = analysis.raw_analysis?.score_breakdown;
+                  const raw = analysis.raw_analysis;
                   return (
-                    <ScoreBreakdown
-                      key={idx}
-                      score={analysis.overall_score}
-                      category={lead.lead_category}
-                      breakdown={breakdown}
-                    />
+                    <div key={idx} className="space-y-6">
+                      {breakdown && (
+                        <ScoreBreakdown
+                          score={analysis.overall_score}
+                          category={lead.lead_category}
+                          breakdown={breakdown}
+                        />
+                      )}
+                      {raw && Object.keys(raw).length > 0 && (
+                        <DeepAnalysisReport
+                          score={analysis.overall_score}
+                          category={lead.lead_category}
+                          raw={raw}
+                        />
+                      )}
+                    </div>
                   );
-                }
-                return null;
-              })
+                })}
+
+                {/* Website Message + WhatsApp */}
+                <GlassCard className="p-6">
+                  <h3 className="text-lg font-bold text-offwhite flex items-center gap-2 mb-4">
+                    <MessageSquare className="w-5 h-5 text-steel" />
+                    Outreach Message
+                  </h3>
+                  {websiteMessage ? (
+                    <div className="space-y-4">
+                      <div className="bg-gradient-to-br from-ocean/30 to-navy rounded-xl border border-ocean/40 p-5 min-h-[100px]">
+                        <p className="text-sm text-ice/90 leading-relaxed whitespace-pre-wrap">{websiteMessage}</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <LoadingButton
+                          onClick={handleWhatsAppSend}
+                          disabled={!lead.phone}
+                          title={!lead.phone ? 'No phone number available' : ''}
+                          className="flex-1"
+                        >
+                          <Send className="w-4 h-4" />
+                          Send on WhatsApp
+                        </LoadingButton>
+                        <LoadingButton
+                          variant="outline"
+                          onClick={handleGenerateWebsiteMessage}
+                          isLoading={isGeneratingMessage}
+                          className="border-steel/30 text-ice"
+                        >
+                          Regenerate
+                        </LoadingButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-5">
+                      <p className="text-sm text-ice/60 mb-4">
+                        Generate a personalized WhatsApp message mentioning specific website issues.
+                      </p>
+                      <LoadingButton
+                        onClick={handleGenerateWebsiteMessage}
+                        isLoading={isGeneratingMessage}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Generate Message
+                      </LoadingButton>
+                    </div>
+                  )}
+                </GlassCard>
+              </>
             ) : (
               <GlassCard className="p-6">
                 <div className="flex flex-col items-center text-center py-6">

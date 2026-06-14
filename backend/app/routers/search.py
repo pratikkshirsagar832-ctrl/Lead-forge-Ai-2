@@ -11,6 +11,8 @@ Endpoints:
 
 from datetime import datetime, timezone
 
+import math
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
@@ -166,6 +168,48 @@ async def get_search_detail(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch search: {str(e)}")
+
+
+@router.get("/{search_id}/results")
+async def get_search_results(
+    search_id: str,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(4, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get leads for a search progressively (batches of 4 for live display)."""
+    supabase = get_supabase_admin()
+    offset = (page - 1) * per_page
+
+    try:
+        count_resp = (
+            supabase.table("leads")
+            .select("id", count="exact")
+            .eq("search_id", search_id)
+            .eq("user_id", current_user["id"])
+            .execute()
+        )
+        total = count_resp.count or 0
+
+        response = (
+            supabase.table("leads")
+            .select("id, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite")
+            .eq("search_id", search_id)
+            .eq("user_id", current_user["id"])
+            .order("created_at", desc=False)
+            .range(offset, offset + per_page - 1)
+            .execute()
+        )
+
+        return {
+            "items": response.data or [],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": max(1, math.ceil(total / per_page)),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch results: {str(e)}")
 
 
 @router.get("/{search_id}/status", response_model=SearchStatusResponse)
