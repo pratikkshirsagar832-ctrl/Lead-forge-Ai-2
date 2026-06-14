@@ -13,24 +13,31 @@ async def check_search_limit(current_user: dict = Depends(get_current_user)) -> 
     user_id = current_user["id"]
 
     try:
-        resp = supabase.rpc("get_remaining_searches", {"p_user_id": user_id}).execute()
+        plan_max = 0
+        plan_name = "Free"
 
-        remaining = 0
-        if resp and resp.data is not None:
-            if isinstance(resp.data, list) and len(resp.data) > 0:
-                remaining = resp.data[0].get("get_remaining_searches", 0)
-            elif isinstance(resp.data, (int, float)):
-                remaining = int(resp.data)
+        sub_resp = supabase.table("user_subscriptions").select("plan_id, status").eq("user_id", user_id).execute()
+        if sub_resp.data and len(sub_resp.data) > 0:
+            sub = sub_resp.data[0]
+            plan_id = sub.get("plan_id", "free")
+            plan_resp = supabase.table("plans").select("searches_per_day, name").eq("id", plan_id).execute()
+            if plan_resp.data and len(plan_resp.data) > 0:
+                plan_max = plan_resp.data[0].get("searches_per_day", 1)
+                plan_name = plan_resp.data[0].get("name", "Free")
+
+        if plan_max <= 0:
+            plan_max = 1
+
+        from datetime import date
+        today = date.today().isoformat()
+        usage_resp = supabase.table("daily_usage").select("searches_run").eq("user_id", user_id).eq("date", today).execute()
+        used_today = 0
+        if usage_resp.data and len(usage_resp.data) > 0:
+            used_today = usage_resp.data[0].get("searches_run", 0) or 0
+
+        remaining = max(0, plan_max - used_today)
 
         if remaining <= 0:
-            sub_resp = supabase.rpc("get_user_subscription", {"p_user_id": user_id}).execute()
-            plan_name = "Free"
-            if sub_resp and sub_resp.data:
-                if isinstance(sub_resp.data, list) and len(sub_resp.data) > 0:
-                    plan_name = sub_resp.data[0].get("plan_name", "Free")
-                elif isinstance(sub_resp.data, dict):
-                    plan_name = sub_resp.data.get("plan_name", "Free")
-
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail={

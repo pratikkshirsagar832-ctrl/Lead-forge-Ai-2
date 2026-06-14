@@ -3,7 +3,7 @@ import hmac
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
 from app.config import get_settings
 from app.database import get_supabase_admin
@@ -50,7 +50,7 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
 
 @router.post("/create-order")
 async def create_order(
-    plan_id: str,
+    plan_id: str = Body(..., embed=True),
     current_user: dict = Depends(get_current_user),
 ):
     settings = get_settings()
