@@ -47,6 +47,16 @@ async def get_current_user(
             "name": user.user_metadata.get("full_name", user.user_metadata.get("name", user.email or "")),
         }
 
+        try:
+            existing = supabase.table("users").select("id").eq("id", user.id).limit(1).execute()
+            if not existing.data:
+                supabase.table("users").insert({
+                    "id": user.id,
+                    "email": user.email or "",
+                }).execute()
+        except Exception as sync_err:
+            logger.warning(f"User sync failed (non-critical): {sync_err}")
+
         _token_cache[token] = {"user": result, "expires_at": time.time() + CACHE_TTL}
         return result
 
