@@ -18,10 +18,14 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
 
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+
     gmaps_scraper_path: str = "backend/google-maps-scraper/google-maps-scraper.exe"
 
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
+    site_url: str = "http://localhost:3000"
 
     environment: str = "development"
 

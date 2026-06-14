@@ -22,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className={`${inter.className} ${spaceGrotesk.variable} ${dmSans.variable} min-h-screen bg-navy text-ice antialiased`}>
+          <script src="https://checkout.razorpay.com/v1/checkout.js" />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -7,3 +7,4 @@ pydantic-settings==2.7.1
 python-multipart==0.0.20
 python-dotenv==1.0.1
 scrapling==0.2.99
+razorpay==1.4.0

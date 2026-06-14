@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from app.database import get_supabase_admin
 from app.middleware.auth_middleware import get_current_user
+from app.middleware.usage_middleware import check_search_limit, increment_search_usage
 from app.schemas.search import (
     SearchCreateRequest,
     SearchHistoryItem,
@@ -34,13 +35,12 @@ router = APIRouter(prefix="/api/searches", tags=["Searches"])
 async def create_search(
     request: SearchCreateRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(check_search_limit),
 ):
     """Create a new search and start the background pipeline."""
     supabase = get_supabase_admin()
     user_id = current_user["id"]
 
-    # Create search row
     search_data = {
         "user_id": user_id,
         "niche": request.niche.strip(),
@@ -60,13 +60,18 @@ async def create_search(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create search: {str(e)}")
 
-    # Start background pipeline
     background_tasks.add_task(
         run_search_pipeline,
         search_id=search["id"],
         user_id=user_id,
         niche=request.niche.strip(),
         location=request.location.strip(),
+    )
+
+    background_tasks.add_task(
+        increment_search_usage,
+        current_user={"id": user_id},
+        leads_count=0,
     )
 
     return search

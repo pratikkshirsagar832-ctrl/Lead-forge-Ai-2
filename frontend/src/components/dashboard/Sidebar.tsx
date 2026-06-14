@@ -1,18 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutDashboard, 
-  Search, 
-  Users, 
-  History, 
-  Download, 
+import { supabase } from '@/lib/supabase';
+import api from '@/lib/api';
+import {
+  LayoutDashboard,
+  Search,
+  Users,
+  History,
+  Download,
   Settings,
   Target,
   X,
+  CreditCard,
+  LogOut,
+  User,
+  Zap,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -22,11 +29,43 @@ const navItems = [
   { name: 'Leads', href: '/dashboard/leads', icon: Users },
   { name: 'History', href: '/dashboard/history', icon: History },
   { name: 'Export', href: '/dashboard/export', icon: Download },
+  { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const [user, setUser] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (u) setUser(u);
+
+      try {
+        const resp = await api.get('/api/auth/me');
+        if (resp.data?.subscription) {
+          setSubscription(resp.data.subscription);
+        }
+      } catch {}
+    };
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+
+  const planBadge = subscription?.plan_name || 'Free';
+  const planColor = planBadge === 'Pro' ? 'bg-violet/20 text-violet border-violet/30'
+    : planBadge === 'Agency' ? 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+    : planBadge === 'Solo' ? 'text-sky-400 bg-sky-500/10 border-sky-500/30'
+    : 'text-ice/60 bg-ocean/20 border-ocean/30';
+
+  const remaining = subscription?.remaining_searches ?? 1;
+  const searchesPerDay = subscription?.searches_per_day ?? 1;
 
   return (
     <>
@@ -50,7 +89,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
@@ -60,8 +99,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 onClick={onClose}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group',
-                  isActive 
-                    ? 'bg-steel text-offwhite shadow-lg shadow-steel/20' 
+                  isActive
+                    ? 'bg-steel text-offwhite shadow-lg shadow-steel/20'
                     : 'text-ice/60 hover:text-offwhite hover:bg-ocean/50'
                 )}
               >
@@ -72,12 +111,47 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           })}
         </nav>
 
-      <div className="p-4 border-t border-ocean/40">
-        <div className="flex items-center justify-center">
-          <ThemeToggle />
+        {/* User section */}
+        <div className="p-4 border-t border-ocean/40 space-y-3">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet to-steel flex items-center justify-center text-xs font-bold text-offwhite shrink-0">
+              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-offwhite truncate">{user?.email || 'User'}</p>
+              <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded border', planColor)}>
+                {planBadge === 'Free' && subscription?.is_trial_expired ? 'Trial Expired' : planBadge}
+              </span>
+            </div>
+          </div>
+
+          {searchesPerDay > 0 && (
+            <div className="px-2">
+              <div className="flex justify-between text-[10px] text-ice/50 mb-1">
+                <span>Searches today</span>
+                <span>{remaining}/{searchesPerDay}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-ocean/30 overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all', remaining > 0 ? 'bg-steel' : 'bg-rose-500')}
+                  style={{ width: `${Math.min(100, ((searchesPerDay - remaining) / searchesPerDay) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between px-2">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-[11px] text-ice/40 hover:text-rose-400 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 }

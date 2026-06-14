@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from './supabase';
 
 const envApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 const isBrowser = typeof window !== 'undefined';
@@ -9,5 +10,33 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });
+
+api.interceptors.request.use(async (config) => {
+  if (isBrowser) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401 && isBrowser) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+        if (data?.session) {
+          error.config.headers.Authorization = `Bearer ${data.session.access_token}`;
+          return api(error.config);
+        }
+      }
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;
