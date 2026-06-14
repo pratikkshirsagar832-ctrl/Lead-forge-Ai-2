@@ -10,25 +10,35 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const handleCallback = async () => {
-      const { data, error } = await supabase.auth.exchangeCodeForSession(
-        window.location.href
-      );
+    let mounted = true;
 
-      if (error) {
-        setError(error.message);
-        return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) return;
+        if (event === 'SIGNED_IN' && session) {
+          router.replace('/dashboard');
+        }
       }
+    );
 
-      if (data?.session) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted && session) {
         router.replace('/dashboard');
-      } else {
-        setError('No session returned. Please try logging in again.');
       }
-    };
+    });
 
-    handleCallback();
-  }, [router]);
+    const timeout = setTimeout(() => {
+      if (mounted && !error) {
+        router.replace('/login');
+      }
+    }, 15000);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [router, error]);
 
   if (error) {
     return (
