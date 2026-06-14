@@ -11,7 +11,7 @@ export function Footer() {
               <div className="bg-steel rounded-lg p-1">
                 <Target className="w-5 h-5 text-offwhite" />
               </div>
-              <span className="font-bold text-xl tracking-tight">LeadForge AI</span>
+              <span className="font-bold text-xl tracking-tight">Hyperclients</span>
             </Link>
             <p className="max-w-xs leading-relaxed text-sm text-ice/60">
               The automated lead generation engine built for agency owners, freelancers, and B2B founders.
@@ -37,7 +37,7 @@ export function Footer() {
         </div>
 
         <div className="flex flex-col md:flex-row items-center justify-between text-sm">
-          <p>© {new Date().getFullYear()} LeadForge AI. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Hyperclients. All rights reserved.</p>
         </div>
       </div>
     </footer>

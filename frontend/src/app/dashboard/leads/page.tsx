@@ -65,7 +65,7 @@ function LeadsContent() {
         <div className="relative z-10 p-12 text-center bg-gradient-to-br from-ocean/30 to-navy rounded-2xl">
           <EmptyState
             title="No leads match your criteria"
-            description="Try removing some filters, changing your search params, or running a new LeadForge AI search operation altogether."
+            description="Try removing some filters, changing your search params, or running a new Hyperclients search operation altogether."
             actionText="Initialize Search Pipeline"
             actionHref="/dashboard/search"
           />

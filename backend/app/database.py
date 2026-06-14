@@ -1,5 +1,5 @@
 """
-LeadForge AI — Supabase Database Clients
+Hyperclients — Supabase Database Clients
 
 Provides two client factories:
   - get_supabase_client(): anon/user-facing client

@@ -1,5 +1,5 @@
 """
-LeadForge AI — AI Pitch Service
+Hyperclients — AI Pitch Service
 
 Generates professional outreach pitches using Gemini API.
 On-demand only — not called automatically during search pipeline.

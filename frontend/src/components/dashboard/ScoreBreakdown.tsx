@@ -42,8 +42,8 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
   const categoryLabel = category === 'hot' ? 'Hot Lead — Needs Help' : category === 'warm' ? 'Warm Lead — Some Potential' : 'Skip';
 
   return (
-    <GlassCard className="p-6">
-      <div className="flex items-center gap-2 mb-5">
+    <GlassCard className="p-6" delay={0.1}>
+      <div className="flex items-center gap-2 mb-5 animate-fade-in-down">
         <Target className="w-5 h-5 text-steel" />
         <h3 className="text-lg font-bold text-offwhite">Website Score Breakdown</h3>
       </div>
@@ -83,7 +83,8 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
                   className={cn(
                     'flex items-start gap-2.5 p-2.5 rounded-lg border',
                     cfg.bg,
-                    `border-${item.severity === 'critical' ? 'rose' : item.severity === 'major' ? 'amber' : 'ice'}/20`
+                    `border-${item.severity === 'critical' ? 'rose' : item.severity === 'major' ? 'amber' : 'ice'}/20`,
+                    `animate-fade-in-up animate-delay-${Math.min(i * 100, 500)}`
                   )}
                 >
                   <Icon className={cn('w-4 h-4 shrink-0 mt-0.5', cfg.color)} />
@@ -111,7 +112,7 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
             {breakdown.bonuses.map((item, i) => (
               <div
                 key={i}
-                className="flex items-start gap-2.5 p-2.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20"
+                className="flex items-start gap-2.5 p-2.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20 animate-fade-in-up"
               >
                 <Plus className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">

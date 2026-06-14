@@ -13,7 +13,8 @@ import { Skeleton } from '@/components/shared/Skeleton';
 import { ScoreBreakdown } from '@/components/dashboard/ScoreBreakdown';
 import {
   ArrowLeft, MapPin, Phone, Globe, Star,
-  MessageSquare, FileText, ExternalLink, Activity
+  MessageSquare, FileText, ExternalLink, Activity,
+  Loader2, CheckCircle2, Target
 } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -28,6 +29,7 @@ export default function LeadDetailPage() {
   const [notes, setNotes] = useState('');
   const [isGeneratingPitch, setIsGeneratingPitch] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isAnalyzingWebsite, setIsAnalyzingWebsite] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +71,28 @@ export default function LeadDetailPage() {
       showToast(error.response?.data?.detail || 'Failed to generate pitch', 'error');
     } finally {
       setIsGeneratingPitch(false);
+    }
+  };
+
+  const handleAnalyzeWebsite = async () => {
+    try {
+      setIsAnalyzingWebsite(true);
+      const { data } = await api.post(API_ROUTES.leads.analyzeWebsite(id as string));
+      setLead((prev: any) => ({
+        ...prev,
+        website_analyses: [{
+          overall_score: data.data.overall_score,
+          issues: data.data.issues,
+          raw_analysis: data.data.raw_analysis,
+        }],
+        website_health_score: data.data.overall_score,
+        lead_category: data.data.category,
+      }));
+      showToast('Website analysis complete!', 'success');
+    } catch (error: any) {
+      showToast(error.response?.data?.detail || 'Failed to analyze website', 'error');
+    } finally {
+      setIsAnalyzingWebsite(false);
     }
   };
 
@@ -258,25 +282,56 @@ export default function LeadDetailPage() {
             </LoadingButton>
           </GlassCard>
 
-          {lead.website_analyses && lead.website_analyses.length > 0 && (
-            lead.website_analyses.map((analysis: any, idx: number) => {
-              const breakdown = analysis.raw_analysis?.score_breakdown;
-              const score = analysis.overall_score ?? 100;
-              const isSkip = score >= 70;
-
-              if (breakdown && !isSkip) {
-                return (
-                  <ScoreBreakdown
-                    key={idx}
-                    score={score}
-                    category={lead.lead_category}
-                    breakdown={breakdown}
-                  />
-                );
-              }
-
-              return null;
-            })
+          {/* Website Analysis Section */}
+          {lead.website_url ? (
+            lead.website_analyses && lead.website_analyses.length > 0 ? (
+              lead.website_analyses.map((analysis: any, idx: number) => {
+                const breakdown = analysis.raw_analysis?.score_breakdown;
+                if (breakdown) {
+                  return (
+                    <ScoreBreakdown
+                      key={idx}
+                      score={analysis.overall_score}
+                      category={lead.lead_category}
+                      breakdown={breakdown}
+                    />
+                  );
+                }
+                return null;
+              })
+            ) : (
+              <GlassCard className="p-6">
+                <div className="flex flex-col items-center text-center py-6">
+                  <Target className="w-10 h-10 text-steel/50 mb-3" />
+                  <h3 className="text-lg font-bold text-offwhite mb-1">Website Score Not Available</h3>
+                  <p className="text-sm text-ice/60 mb-5 max-w-xs">
+                    Click below to analyze this lead&apos;s website — we&apos;ll check for SEO, UX,
+                    mobile-friendliness, and more.
+                  </p>
+                  <LoadingButton
+                    onClick={handleAnalyzeWebsite}
+                    isLoading={isAnalyzingWebsite}
+                  >
+                    Get Website Score
+                  </LoadingButton>
+                </div>
+              </GlassCard>
+            )
+          ) : (
+            <GlassCard className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-offwhite">High Opportunity Lead</h3>
+                  <p className="text-sm text-ice/60">
+                    No website found — this business needs digital presence the most.
+                    Reach out with your proposal.
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
           )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 """
-LeadForge AI — User Schemas
+Hyperclients — User Schemas
 """
 
 from datetime import datetime

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events."""
-    logger.info("🚀 LeadForge AI Backend starting up...")
+    logger.info("Hyperclients Backend starting up...")
 
     # Cleanup stale searches (older than 15 minutes and still running)
     try:
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("👋 LeadForge AI Backend shutting down...")
+    logger.info("Hyperclients Backend shutting down...")
 
 
 # ── App Creation ─────────────────────────────────────────
@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="LeadForge AI",
+        title="Hyperclients",
         description="Lead discovery and qualification API for freelance developers and agencies.",
         version="2.1.0",
         docs_url=None if settings.is_production else "/docs",
@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
     @app.get("/", tags=["Root"])
     async def root():
         return {
-            "app": "LeadForge AI",
+            "app": "Hyperclients",
             "version": "2.1.0",
             "status": "running",
             "docs": "/docs",

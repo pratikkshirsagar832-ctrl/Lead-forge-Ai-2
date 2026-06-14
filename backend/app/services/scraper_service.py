@@ -1,5 +1,5 @@
 """
-LeadForge AI — Google Maps Scraper Service
+Hyperclients — Google Maps Scraper Service
 
 Wraps the google-maps-scraper binary via subprocess.
 Handles temp file management, timeout, CSV parsing, and error recovery.
@@ -83,7 +83,7 @@ async def run_maps_scraper(
     run_id = str(uuid.uuid4())[:8]
 
     # Create temp files for input and output
-    tmp_dir = tempfile.mkdtemp(prefix="leadforge_scraper_")
+    tmp_dir = tempfile.mkdtemp(prefix="hyperclients_scraper_")
     input_file = os.path.join(tmp_dir, f"input_{run_id}.txt")
     output_file = os.path.join(tmp_dir, f"results_{run_id}.csv")
 

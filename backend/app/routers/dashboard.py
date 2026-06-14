@@ -1,5 +1,5 @@
 """
-LeadForge AI — Dashboard Router
+Hyperclients — Dashboard Router
 
 Endpoints:
   GET /api/dashboard/stats — get dashboard statistics

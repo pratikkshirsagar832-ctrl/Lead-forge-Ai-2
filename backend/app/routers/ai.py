@@ -1,5 +1,5 @@
 """
-LeadForge AI — AI Router
+Hyperclients — AI Router
 
 Endpoints:
   POST /api/ai/pitch/{lead_id} — generate an AI pitch for a lead

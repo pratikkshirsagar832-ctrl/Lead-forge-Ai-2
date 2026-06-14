@@ -1,5 +1,5 @@
 """
-LeadForge AI — Website Analyzer Service (Phase 1 Enhanced)
+Hyperclients — Website Analyzer Service
 
 Uses Scrapling's AsyncFetcher + Selector for 50+ quality signals.
 Categorizes leads:
@@ -432,7 +432,7 @@ async def analyze_website(url: str) -> dict[str, Any]:
 
         # ── 404 ERROR PAGE CHECK ────────────────────────────────
         try:
-            random_url = f"{parsed_url.scheme}://{parsed_url.netloc}/nonexistent-page-leadforge-check"
+            random_url = f"{parsed_url.scheme}://{parsed_url.netloc}/nonexistent-page-hyperclients-check"
             err_resp = await AsyncFetcher.get(random_url, timeout=5, follow_redirects=False)
             if err_resp and err_resp.status == 404:
                 err_text = str(err_resp.get_all_text(separator=" ", strip=True) or "").lower()

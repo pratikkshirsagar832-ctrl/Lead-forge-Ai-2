@@ -33,16 +33,16 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="fixed inset-0 bg-navy/70 backdrop-blur-sm z-20 lg:hidden" onClick={onClose} />
       )}
       <div className={cn(
-        'w-64 bg-navy flex flex-col h-screen fixed top-0 left-0 border-r border-ocean/40 shrink-0 z-30 transition-transform duration-300',
+        'w-64 bg-gradient-to-b from-navy to-ocean/20 flex flex-col h-screen fixed top-0 left-0 border-r border-ocean/40 shrink-0 z-30 transition-transform duration-300 backdrop-blur-sm',
         'lg:translate-x-0',
         open ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="p-6 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2 group" onClick={onClose}>
-            <div className="bg-steel rounded-lg p-1.5 group-hover:scale-105 transition-transform">
+            <div className="bg-gradient-to-br from-violet to-steel rounded-lg p-1.5 group-hover:scale-105 transition-transform duration-300 shadow-lg shadow-violet/20">
               <Target className="w-5 h-5 text-offwhite" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-offwhite">LeadForge AI</span>
+            <span className="font-bold text-xl tracking-tight text-offwhite" style={{ fontFamily: 'var(--font-heading)' }}>Hyperclients</span>
           </Link>
           <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg hover:bg-ocean/50 text-ice/60 hover:text-offwhite transition-colors">
             <X className="w-5 h-5" />

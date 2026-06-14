@@ -102,7 +102,7 @@ export default function SearchPage() {
                 <div className="bg-steel/10 p-4 rounded-xl border border-steel/20 flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-steel shrink-0 mt-0.5" />
                   <p className="text-sm text-ice/80 leading-relaxed">
-                    LeadForge will scrape Google Maps for <span className="font-semibold px-1 text-offwhite">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
+                    Hyperclients will scrape Google Maps for <span className="font-semibold px-1 text-offwhite">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
                   </p>
                 </div>
 

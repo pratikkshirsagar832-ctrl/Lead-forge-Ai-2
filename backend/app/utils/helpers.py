@@ -1,5 +1,5 @@
 """
-LeadForge AI — Utility Helpers
+Hyperclients — Utility Helpers
 
 Shared helper functions used across the application.
 """

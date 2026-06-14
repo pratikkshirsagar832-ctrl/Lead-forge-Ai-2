@@ -1,5 +1,5 @@
 """
-LeadForge AI — Search Router
+Hyperclients — Search Router
 
 Endpoints:
   POST /api/searches          — create a new search

@@ -1,5 +1,5 @@
 """
-LeadForge AI — Search Schemas
+Hyperclients — Search Schemas
 """
 
 from datetime import datetime

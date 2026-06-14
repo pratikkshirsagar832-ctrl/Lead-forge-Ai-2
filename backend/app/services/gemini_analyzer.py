@@ -1,5 +1,5 @@
 """
-LeadForge AI — Gemini Deep Website Analyzer (Phase 2)
+Hyperclients — Gemini Deep Website Analyzer
 
 Takes batch of Scrapling-extracted site data, sends to Gemini 2.5 Flash-Lite,
 and returns deep analysis: content quality, SEO depth, UX issues, broken elements.

@@ -1,5 +1,5 @@
 """
-LeadForge AI — Leads Router
+Hyperclients — Leads Router
 
 Endpoints:
   GET    /api/leads              — list leads (paginated + filtered)
@@ -10,6 +10,7 @@ Endpoints:
   PATCH  /api/leads/{id}/favorite — toggle favorite
 """
 
+import asyncio
 import csv
 import io
 import logging
@@ -31,6 +32,7 @@ from app.schemas.lead import (
     LeadPaginatedResponse,
     LeadStatusUpdate,
 )
+from app.services.analyzer_service import analyze_website
 
 router = APIRouter(prefix="/api/leads", tags=["Leads"])
 
@@ -38,7 +40,7 @@ router = APIRouter(prefix="/api/leads", tags=["Leads"])
 @router.get("", response_model=LeadPaginatedResponse)
 async def list_leads(
     search_id: Optional[str] = Query(None, description="Filter by search ID"),
-    lead_category: Optional[str] = Query(None, description="Filter by category (hot/warm/skip)"),
+    lead_category: Optional[str] = Query(None, description="Filter by category (hot/warm)"),
     user_status: Optional[str] = Query(None, description="Filter by user status"),
     is_favorite: Optional[bool] = Query(None, description="Filter favorites only"),
     search: Optional[str] = Query(None, description="Search business name"),
@@ -161,6 +163,65 @@ async def export_leads_csv(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to export leads: {str(e)}")
+
+
+@router.post("/{lead_id}/analyze-website")
+async def analyze_lead_website(
+    lead_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """On-demand website analysis for a warm lead."""
+    supabase = get_supabase_admin()
+
+    try:
+        lead_resp = (
+            supabase.table("leads")
+            .select("id, website_url, business_name, lead_category")
+            .eq("id", lead_id)
+            .eq("user_id", current_user["id"])
+            .single()
+            .execute()
+        )
+        if not lead_resp.data:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        lead = lead_resp.data
+        url = lead.get("website_url", "")
+        if not url:
+            raise HTTPException(status_code=400, detail="Lead has no website URL")
+
+        result = await analyze_website(url)
+
+        analysis_data = {
+            "lead_id": lead_id,
+            "website_url": url,
+            "overall_score": result.get("overall_score", 0),
+            "issues": result.get("issues", []),
+            "emails_found": result.get("emails_found", []),
+            "phones_found": result.get("phones_found", []),
+            "raw_analysis": result.get("raw_analysis", {}),
+        }
+        supabase.table("website_analyses").insert(analysis_data).execute()
+
+        update_data = {
+            "website_health_score": result.get("overall_score", 0),
+            "lead_category": result.get("category", "warm"),
+        }
+        emails = result.get("emails_found", [])
+        if emails and not lead.get("email_found"):
+            update_data["email_found"] = emails[0]
+        supabase.table("leads").update(update_data).eq("id", lead_id).execute()
+
+        return {
+            "status": "ok",
+            "data": result,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to analyze website for lead {lead_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @router.get("/{lead_id}", response_model=LeadDetail)

@@ -111,7 +111,7 @@ export function StatsCards() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: idx * 0.1, ease: 'easeOut' }}
         >
-          <GlassCard hoverEffect className="relative overflow-hidden">
+          <GlassCard hoverEffect delay={idx * 0.08} className="relative overflow-hidden">
             <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} pointer-events-none`} />
             <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${card.accent} opacity-60`} />
             <div className="relative p-6">
