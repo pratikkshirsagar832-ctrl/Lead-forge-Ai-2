@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk, DM_Sans } from 'next/font/google';
+import Script from 'next/script';
 import '../styles/globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ToastContainer } from '@/components/shared/Toast';
@@ -22,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className={`${inter.className} ${spaceGrotesk.variable} ${dmSans.variable} min-h-screen bg-navy text-ice antialiased`}>
-          <script src="https://checkout.razorpay.com/v1/checkout.js" />
+          <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
