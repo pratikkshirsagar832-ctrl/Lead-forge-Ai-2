@@ -12,8 +12,8 @@ import { Check, Zap, Star, Building2, ArrowRight, Loader2 } from 'lucide-react';
 const plans = [
   {
     id: 'free', name: 'Free', price: 0, currency: '₹', period: '/mo',
-    leads: '10', searches: '1', trial: '3 day trial',
-    features: ['1 search per day', 'Up to 10 leads/day', 'Website analysis', 'Basic lead data'],
+    leads: '30', searches: '3', trial: '3 day trial',
+    features: ['3 searches per day', 'Up to 10 leads/search', 'Website analysis', 'Basic lead data'],
     icon: Zap, color: 'text-ice/60',
   },
   {

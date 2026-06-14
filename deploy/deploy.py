@@ -1,17 +1,52 @@
+"""
+LeadForge AI — Production Deploy Script
+1. Verify Supabase migration has been run (manual step)
+2. Build + deploy using docker-compose
+3. Configure nginx
+4. Health checks
+"""
+
 import paramiko
-import sys, os, io
+import sys
+import os
+import io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 HOST = '85.239.237.53'
 PASSWORD = 'Lu7chLT38HSbcNndP7WA'
-PROJECT_DIR = r'D:\Lead-Forge-Ai'
+PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def run(client, cmd, timeout=120):
     stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
     out = stdout.read().decode('utf-8', errors='replace')
     err = stderr.read().decode('utf-8', errors='replace')
     return out.strip(), err.strip()
+
+
+print("""
+╔═══════════════════════════════════════════════════════╗
+║         LeadForge AI — Deploy to Production           ║
+╚═══════════════════════════════════════════════════════╝
+
+BEFORE RUNNING THIS SCRIPT:
+
+1. Go to Supabase SQL Editor:
+   https://supabase.com/dashboard/project/wtradahkkpbkbhmkkpal/sql/new
+
+2. Run the complete migration from:
+   supabase/migration.sql
+
+3. Ensure these env vars are set in GitHub Secrets:
+   - SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY
+   - GEMINI_API_KEY / RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET
+""")
+
+confirm = input("Have you run the Supabase migration? (yes/no): ")
+if confirm.lower() != 'yes':
+    print("Run the migration first, then re-run this script.")
+    sys.exit(1)
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -22,7 +57,7 @@ try:
     sftp = client.open_sftp()
 
     # ── STEP 1: Install Docker ──
-    print('=== STEP 1: Installing Docker ===')
+    print('\n=== STEP 1: Installing Docker ===')
     run(client, 'apt-get update -qq')
     run(client, 'apt-get install -y -qq ca-certificates curl')
     run(client, 'install -m 0755 -d /etc/apt/keyrings')
@@ -58,33 +93,38 @@ try:
                 line = 'ENVIRONMENT=production'
             elif line.startswith('FRONTEND_URL'):
                 line = 'FRONTEND_URL=http://85.239.237.53'
-            elif line.startswith('BACKEND_URL'):
-                line = 'BACKEND_URL=http://localhost:8000'
+            elif line.startswith('SITE_URL'):
+                line = 'SITE_URL=http://85.239.237.53'
             env_lines.append(line)
     env_content = '\n'.join(env_lines)
-    
-    # Upload via SFTP
-    with sftp.open('/root/leadforge/.env', 'w') as f:
+
+    with sftp.open('/root/leadforge/backend/.env', 'w') as f:
         f.write(env_content)
-    print('  .env uploaded')
+    print('  backend/.env uploaded')
+
+    # Upload frontend .env.local
+    fe_env_local = os.path.join(PROJECT_DIR, 'frontend', '.env.local')
+    with open(fe_env_local, 'r', encoding='utf-8') as f:
+        fe_env = f.read()
+    fe_env = fe_env.replace('http://localhost:8000', 'http://85.239.237.53')
+    with sftp.open('/root/leadforge/frontend/.env.local', 'w') as f:
+        f.write(fe_env)
+    print('  frontend/.env.local uploaded')
 
     # ── STEP 4: Docker build & start ──
     print('\n=== STEP 4: Building containers ===')
     out, err = run(client, 'cd /root/leadforge && docker compose build 2>&1', 600)
-    if err and 'error' in err.lower():
-        print(f'  BUILD ERR: {err[-500:]}')
+    if 'error' in out.lower() or 'error' in err.lower():
+        print(f'  BUILD ERR: {(err or out)[-500:]}')
     else:
         print('  Build OK')
-        # Also check if there were errors in the combined output
-        if 'error' in out.lower():
-            print(f'  BUILD WARN: {out[-500:]}')
 
     print('\n  Starting containers...')
     out, err = run(client, 'cd /root/leadforge && docker compose up -d 2>&1', 60)
     print(f'  {out[:500]}')
-    if err: print(f'  ERR: {err[:300]}')
+    if err:
+        print(f'  ERR: {err[:300]}')
 
-    # Show container status
     out, _ = run(client, 'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"')
     print(f'\n  Containers:\n{out}')
 
@@ -162,14 +202,16 @@ server {
     ng, _ = run(client, 'curl -s -o /dev/null -w "%{http_code}" http://85.239.237.53/')
     print(f'  Nginx: HTTP {ng}')
 
-    print('\n========================================')
-    print('  DEPLOYMENT COMPLETE!')
-    print('========================================')
-    print(f'  URL: http://85.239.237.53')
-    print(f'  API: http://85.239.237.53/api/health')
-    print(f'  Dashboard: http://85.239.237.53/dashboard')
-    print('========================================')
+    print("""
+╔═══════════════════════════════════════════════════════╗
+║              DEPLOYMENT COMPLETE!                      ║
+╚═══════════════════════════════════════════════════════╝
+  URL: http://85.239.237.53
+  API: http://85.239.237.53/api/health
+  Dashboard: http://85.239.237.53/dashboard
+""")
 
 finally:
-    if sftp: sftp.close()
+    if sftp:
+        sftp.close()
     client.close()

@@ -184,8 +184,8 @@ async def run_maps_scraper(
                 partial_results = _parse_csv_results(output_file, max_results)
                 logger.warning(f"[Scraper:{run_id}] Returning {len(partial_results)} partial results")
                 return partial_results
-            except Exception:
-                pass
+            except Exception as parse_err:
+                logger.warning(f"[Scraper:{run_id}] Failed to parse partial results: {parse_err}")
         raise e
     finally:
         # Cleanup temp files
@@ -232,8 +232,8 @@ def _parse_csv_results(output_file: str, max_results: int) -> list[dict]:
             with open(output_file, "r", encoding="utf-8", errors="replace") as f:
                 preview = f.read()[:500]
                 logger.warning(f"Raw CSV preview: {preview}")
-        except Exception:
-            pass
+        except Exception as read_err:
+            logger.warning(f"Could not read CSV content for debugging: {read_err}")
         raise RuntimeError(f"Failed to parse CSV output: {e}")
 
     return results
@@ -305,10 +305,10 @@ def _cleanup_temp_files(tmp_dir: str, *files: str) -> None:
         try:
             if os.path.exists(f):
                 os.remove(f)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.debug(f"Temp file cleanup warning: {e}")
     try:
         if os.path.exists(tmp_dir):
             os.rmdir(tmp_dir)
-    except OSError:
-        pass
+    except OSError as e:
+        logger.debug(f"Temp dir cleanup warning: {e}")

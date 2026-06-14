@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import api from '@/lib/api';
@@ -27,6 +27,7 @@ export default function BillingPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const upgradeRequested = useRef<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -50,16 +51,21 @@ export default function BillingPage() {
 
   useEffect(() => {
     const upgradeParam = searchParams.get('upgrade');
-    if (upgradeParam && plans.length > 0) {
+    if (upgradeParam && plans.length > 0 && upgradeParam !== upgradeRequested.current) {
       const plan = plans.find((p) => p.id === upgradeParam);
       if (plan && plan.id !== subscription?.plan_id) {
+        upgradeRequested.current = upgradeParam;
         handleUpgrade(plan);
       }
     }
-  }, [searchParams, plans]);
+  }, [searchParams, plans, subscription?.plan_id]);
 
   const handleUpgrade = async (plan: any) => {
     if (plan.price_monthly <= 0) return;
+    if (typeof (window as any).Razorpay === 'undefined') {
+      setError('Payment gateway not loaded. Please refresh the page.');
+      return;
+    }
     setIsProcessing(true);
     setError('');
 
@@ -88,6 +94,8 @@ export default function BillingPage() {
             loadData();
           } catch (err: any) {
             setError(err.response?.data?.detail || 'Payment verification failed');
+          } finally {
+            setIsProcessing(false);
           }
         },
         modal: {

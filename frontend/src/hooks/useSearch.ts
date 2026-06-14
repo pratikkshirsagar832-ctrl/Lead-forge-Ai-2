@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import api from '@/lib/api';
 import { API_ROUTES, POLLING_INTERVAL } from '@/lib/constants';
 import { useSearchStore } from '@/stores/searchStore';
@@ -13,8 +13,11 @@ export function useSearch() {
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const resultsPollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const resultsPageRef = useRef(1);
+  const retryCountRef = useRef(0);
+  const pollStatusRef = useRef<((id: string) => Promise<void>) | null>(null);
+  const pollResultsRef = useRef<((id: string) => Promise<void>) | null>(null);
 
-  const clearPolling = () => {
+  const clearPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
       pollTimerRef.current = null;
@@ -23,7 +26,8 @@ export function useSearch() {
       clearTimeout(resultsPollTimerRef.current);
       resultsPollTimerRef.current = null;
     }
-  };
+    retryCountRef.current = 0;
+  }, []);
 
   const pollResults = useCallback(async (id: string) => {
     try {
@@ -35,9 +39,9 @@ export function useSearch() {
       if (data.total > resultsPageRef.current * 4) {
         resultsPageRef.current += 1;
       }
-      resultsPollTimerRef.current = setTimeout(() => pollResults(id), 4000);
-    } catch (error) {
-      resultsPollTimerRef.current = setTimeout(() => pollResults(id), 4000);
+      resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
+    } catch {
+      resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
     }
   }, [appendResults]);
 
@@ -48,7 +52,6 @@ export function useSearch() {
 
       if (['completed', 'failed', 'cancelled'].includes(data.status)) {
         clearPolling();
-        // One final results poll
         try {
           const { data: finalResults } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=1&per_page=50`);
           if (finalResults.items) {
@@ -63,10 +66,9 @@ export function useSearch() {
           showToast('Search cancelled', 'info');
         }
       } else {
-        pollTimerRef.current = setTimeout(() => pollStatus(id), POLLING_INTERVAL);
+        pollTimerRef.current = setTimeout(() => pollStatusRef.current?.(id), POLLING_INTERVAL);
       }
     } catch (error: any) {
-      console.error('Failed to poll status', error);
       if (error.response?.status === 404) {
         showToast("Search not found or expired", "error");
         clearActiveSearch();
@@ -77,18 +79,30 @@ export function useSearch() {
         clearPolling();
         return;
       }
-      pollTimerRef.current = setTimeout(() => pollStatus(id), POLLING_INTERVAL);
+      retryCountRef.current += 1;
+      if (retryCountRef.current > 50) {
+        clearPolling();
+        showToast('Search status polling stopped after too many retries', 'error');
+        return;
+      }
+      pollTimerRef.current = setTimeout(() => pollStatusRef.current?.(id), POLLING_INTERVAL);
     }
-  }, [setProgress, showToast, clearActiveSearch, appendResults]);
+  }, [setProgress, showToast, clearActiveSearch, appendResults, clearPolling]);
+
+  useEffect(() => {
+    pollStatusRef.current = pollStatus;
+    pollResultsRef.current = pollResults;
+  }, [pollStatus, pollResults]);
 
   const startSearch = async (niche: string, location: string) => {
     try {
       setIsStarting(true);
       clearPolling();
       resultsPageRef.current = 1;
+      retryCountRef.current = 0;
       const { data } = await api.post(API_ROUTES.searches.create, { niche, location });
       setActiveSearch(data.id);
-      setProgress({ status: 'queued', stage: 0, elapsed_seconds: 0 });
+      setProgress({ status: 'queued', elapsed_seconds: 0 });
       showToast('Search started successfully', 'success');
       
       pollStatus(data.id);
@@ -123,7 +137,6 @@ export function useSearch() {
       const { data } = await api.get(API_ROUTES.searches.list);
       setHistory(data.items || []);
     } catch (error) {
-      console.error('Failed to fetch search history', error);
       showToast('Failed to load search history', 'error');
     } finally {
       setIsFetchingHistory(false);
@@ -134,10 +147,11 @@ export function useSearch() {
     if (activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status)) {
       clearPolling();
       resultsPageRef.current = 1;
+      retryCountRef.current = 0;
       pollStatus(activeSearchId);
       pollResults(activeSearchId);
     }
-  }, [activeSearchId, progress, pollStatus, pollResults]);
+  }, [activeSearchId, progress, clearPolling, pollStatus, pollResults]);
 
   return {
     activeSearchId,

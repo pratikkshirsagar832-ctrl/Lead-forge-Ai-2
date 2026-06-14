@@ -70,7 +70,7 @@ async def create_search(
 
     background_tasks.add_task(
         increment_search_usage,
-        current_user={"id": user_id},
+        user_id=user_id,
         leads_count=0,
     )
 
@@ -246,12 +246,12 @@ async def get_search_status(
         created_dt = None
         if row.get("created_at"):
             try: created_dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-            except: pass
+            except: logger.warning(f"Failed to parse created_at: {row.get('created_at')}")
             
         comp_dt = None
         if row.get("completed_at"):
             try: comp_dt = datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00"))
-            except: pass
+            except: logger.warning(f"Failed to parse completed_at: {row.get('completed_at')}")
 
         elapsed = 0
         if created_dt:
@@ -403,10 +403,10 @@ async def debug_test_scraper(request: DebugSearchRequest):
     except Exception as e:
         return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
     finally:
-        try: os.remove(input_path) 
-        except: pass
+        try: os.remove(input_path)
+        except OSError as e: logger.warning(f"Failed to remove temp input: {e}")
         try: os.remove(output_path)
-        except: pass
+        except OSError as e: logger.warning(f"Failed to remove temp output: {e}")
 
 
 

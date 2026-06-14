@@ -114,8 +114,8 @@ async def run_search_pipeline(search_id: str, user_id: str, niche: str, location
                 "status": "failed", "message": "Search failed unexpectedly",
                 "error_message": str(e),
             })
-        except Exception:
-            pass
+        except Exception as update_err:
+            logger.error(f"[Pipeline:{search_id}] Failed to update search status after error: {update_err}")
     finally:
         _active_searches.pop(search_id, None)
 

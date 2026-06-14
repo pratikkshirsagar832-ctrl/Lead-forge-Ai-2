@@ -6,11 +6,15 @@ Endpoints:
   POST /api/ai/website-message/{lead_id} — generate a short WhatsApp outreach message
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase_admin
 from app.middleware.auth_middleware import get_current_user
 from app.services.ai_service import generate_pitch, generate_website_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
 
@@ -72,8 +76,7 @@ async def generate_lead_pitch(
         }
         supabase.table("leads").update(update_data).eq("id", lead_id).execute()
     except Exception as e:
-        # Non-critical — pitch was generated, just couldn't save
-        pass
+        logger.warning(f"Failed to save pitch for lead {lead_id}: {e}")
 
     return {
         "lead_id": lead_id,

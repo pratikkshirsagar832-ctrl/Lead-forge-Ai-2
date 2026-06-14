@@ -50,13 +50,13 @@ async def check_search_limit(current_user: dict = Depends(get_current_user)) -> 
         return current_user
 
 
-async def increment_search_usage(current_user: dict = Depends(get_current_user), leads_count: int = 0):
+async def increment_search_usage(user_id: str, leads_count: int = 0):
     supabase = get_supabase_admin()
     try:
         supabase.rpc("increment_daily_usage", {
-            "p_user_id": current_user["id"],
+            "p_user_id": user_id,
             "p_searches": 1,
             "p_leads": leads_count,
         }).execute()
     except Exception as e:
-        logger.error(f"Failed to increment usage: {e}")
+        logger.error(f"Failed to increment usage for user {user_id}: {e}")
