@@ -9,7 +9,7 @@ export function Footer() {
           <div className="md:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-6 text-offwhite w-fit">
               <div className="bg-steel rounded-lg p-1">
-                <Image src="/hyperclients-logo.png" alt="Hyperclients" width={22} height={22} className="object-contain" />
+                <Image src="/hyperclients-logo.png" alt="Hyperclients" width={40} height={40} className="object-contain" />
               </div>
               <span className="font-bold text-xl tracking-tight">Hyperclients</span>
             </Link>
