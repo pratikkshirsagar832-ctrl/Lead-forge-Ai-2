@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 
@@ -33,6 +34,55 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
 
         if resp and resp.data:
             return resp.data
+    except Exception as e:
+        logger.warning(f"RPC get_user_subscription failed: {e}")
+
+    # Fallback: query tables directly
+    try:
+        sub_resp = supabase.table("user_subscriptions") \
+            .select("*") \
+            .eq("user_id", current_user["id"]) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+
+        if sub_resp.data and len(sub_resp.data) > 0:
+            sub = sub_resp.data[0]
+            plan_id = sub.get("plan_id", "free")
+
+            plan_resp = supabase.table("plans") \
+                .select("*") \
+                .eq("id", plan_id) \
+                .single() \
+                .execute()
+
+            plan = plan_resp.data if plan_resp.data else {}
+
+            from datetime import date
+            today = date.today().isoformat()
+            usage_resp = supabase.table("daily_usage") \
+                .select("searches_run, leads_generated") \
+                .eq("user_id", current_user["id"]) \
+                .eq("date", today) \
+                .execute()
+
+            used = usage_resp.data[0] if usage_resp.data else {}
+            searches_per_day = plan.get("searches_per_day", 1)
+            leads_per_day = plan.get("leads_per_day", 10)
+
+            return {
+                "plan_id": plan_id,
+                "plan_name": plan.get("name", "Free"),
+                "status": sub.get("status", "active"),
+                "searches_per_day": searches_per_day,
+                "leads_per_day": leads_per_day,
+                "remaining_searches": max(0, searches_per_day - (used.get("searches_run", 0) or 0)),
+                "remaining_leads": max(0, leads_per_day - (used.get("leads_generated", 0) or 0)),
+                "current_period_start": sub.get("current_period_start"),
+                "current_period_end": sub.get("current_period_end"),
+                "trial_end": sub.get("trial_end"),
+                "is_trial_expired": sub.get("is_trial_expired", False),
+            }
 
         return {
             "plan_id": "free",
@@ -41,6 +91,7 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
             "searches_per_day": 1,
             "status": "trial",
             "remaining_searches": 1,
+            "remaining_leads": 10,
             "is_trial_expired": False,
         }
     except Exception as e:
@@ -74,10 +125,11 @@ async def create_order(
         if amount <= 0:
             raise HTTPException(status_code=400, detail="Cannot create order for free plan")
 
+        user_short = current_user["id"].replace("-", "")[:12]
         order = client.order.create({
             "amount": amount,
             "currency": "INR",
-            "receipt": f"sub_{current_user['id']}_{plan_id}",
+            "receipt": f"sub_{user_short}_{plan_id}",
             "notes": {
                 "user_id": current_user["id"],
                 "plan_id": plan_id,
@@ -85,9 +137,19 @@ async def create_order(
             },
         })
 
-        supabase.table("user_subscriptions").update({
-            "razorpay_order_id": order["id"],
-        }).eq("user_id", current_user["id"]).execute()
+        existing_sub = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).maybe_single().execute()
+
+        if existing_sub.data:
+            supabase.table("user_subscriptions").update({
+                "razorpay_order_id": order["id"],
+            }).eq("user_id", current_user["id"]).execute()
+        else:
+            supabase.table("user_subscriptions").insert({
+                "user_id": current_user["id"],
+                "plan_id": "free",
+                "razorpay_order_id": order["id"],
+                "status": "pending",
+            }).execute()
 
         return {
             "order_id": order["id"],
@@ -139,13 +201,25 @@ async def verify_payment(
 
     plan = plan_resp.data
 
-    supabase.table("user_subscriptions").update({
+    now = datetime.now(timezone.utc)
+    period_end = now + timedelta(days=30)
+
+    existing = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).maybe_single().execute()
+
+    sub_data = {
         "plan_id": plan_id,
         "status": "active",
         "razorpay_order_id": razorpay_order_id,
-        "current_period_start": "now()",
-        "current_period_end": f"now() + interval '30 days'",
-    }).eq("user_id", current_user["id"]).execute()
+        "razorpay_payment_id": razorpay_payment_id,
+        "current_period_start": now.isoformat(),
+        "current_period_end": period_end.isoformat(),
+    }
+
+    if existing.data:
+        supabase.table("user_subscriptions").update(sub_data).eq("user_id", current_user["id"]).execute()
+    else:
+        sub_data["user_id"] = current_user["id"]
+        supabase.table("user_subscriptions").insert(sub_data).execute()
 
     return {
         "status": "success",
@@ -209,7 +283,7 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
 
     supabase.table("user_subscriptions").update({
         "status": "cancelled",
-        "cancelled_at": "now()",
+        "cancelled_at": datetime.now(timezone.utc).isoformat(),
     }).eq("user_id", current_user["id"]).execute()
 
     return {"status": "cancelled", "message": "Subscription cancelled"}
