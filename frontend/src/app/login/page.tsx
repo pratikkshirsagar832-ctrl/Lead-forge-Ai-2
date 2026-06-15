@@ -48,9 +48,7 @@ export default function LoginPage() {
         password,
       });
       if (signInError) throw signInError;
-      // Wait for session to be fully persisted before navigating
       if (data?.session) {
-        await supabase.auth.getSession();
         router.replace('/dashboard');
       }
     } catch (err: any) {

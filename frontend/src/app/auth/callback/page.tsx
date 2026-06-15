@@ -11,46 +11,51 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     let mounted = true;
-    let completed = false;
 
-    const redirectToDashboard = () => {
-      if (completed) return;
-      completed = true;
-      router.replace('/dashboard');
-    };
+    const handleCallback = async () => {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        const queryParams = new URLSearchParams(window.location.search);
 
-    const redirectToLogin = () => {
-      if (completed) return;
-      completed = true;
-      router.replace('/login');
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!mounted) return;
-        if (event === 'SIGNED_IN' && session) {
-          redirectToDashboard();
+        // PKCE flow: exchange code for session
+        const code = queryParams.get('code');
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+          if (mounted) router.replace('/dashboard');
+          return;
         }
+
+        // Implicit flow: set session from URL hash
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          } as { access_token: string; refresh_token: string });
+          if (!error && mounted) router.replace('/dashboard');
+          else throw error || new Error('No session returned');
+          return;
+        }
+
+        // Already have a session from localStorage
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mounted && session) {
+          router.replace('/dashboard');
+          return;
+        }
+
+        // Nothing worked — timeout then redirect to login
+        setTimeout(() => {
+          if (mounted) router.replace('/login');
+        }, 3000);
+      } catch (err) {
+        console.error('Auth callback error:', err);
+        if (mounted) setTimeout(() => router.replace('/login'), 3000);
       }
-    );
-
-    supabase.auth.getSession().then((result) => {
-      if (mounted && result.data?.session) {
-        redirectToDashboard();
-      }
-    }).catch((err) => {
-      console.error('Auth callback: getSession error', err);
-    });
-
-    const timeout = setTimeout(() => {
-      if (mounted) redirectToLogin();
-    }, 15000);
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-      clearTimeout(timeout);
     };
+
+    handleCallback();
   }, [router]);
 
   if (error) {
