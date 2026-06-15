@@ -24,10 +24,7 @@ export default function DashboardOverview() {
           <div className="p-8 relative">
             <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-violet/10 to-transparent rounded-full blur-3xl pointer-events-none" />
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-amber" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-amber">Quick Action</span>
-              </div>
+              <Sparkles className="w-5 h-5 text-amber mb-4" />
               <h2 className="text-2xl font-bold text-offwhite mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
                 Ready to find more clients?
               </h2>
