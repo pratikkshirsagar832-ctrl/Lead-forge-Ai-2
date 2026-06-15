@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSearch } from '@/hooks/useSearch';
 import api from '@/lib/api';
+import type { SubscriptionInfo } from '@/lib/types';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
@@ -113,7 +114,7 @@ export default function SearchPage() {
     resolver: zodResolver(searchSchema),
   });
 
-  const [subscription, setSubscription] = useState<any>(null);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
 
   useEffect(() => {
     resumePollingIfActive();
