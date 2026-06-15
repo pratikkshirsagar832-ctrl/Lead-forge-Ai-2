@@ -66,6 +66,7 @@ export interface LeadListItem {
   lead_category: string;
   website_health_score: number | null;
   user_status: string;
+  user_notes?: string;
   is_favorite: boolean;
   has_pitch: boolean;
   created_at?: string;
