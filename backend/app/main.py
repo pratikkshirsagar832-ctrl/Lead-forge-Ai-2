@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
         logger.info("Stale search cleanup completed")
     except Exception as e:
-        logger.warning(f"Stale search cleanup failed (non-critical): {e}")
+        logger.warning(f"Stale search cleanup failed (non-critical): {e}", exc_info=True)
 
     settings = get_settings()
     logger.info(f"Environment: {settings.environment}")

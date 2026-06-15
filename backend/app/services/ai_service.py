@@ -94,7 +94,7 @@ async def generate_pitch(
 
 def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
     parts = [
-        f"Write a professional outreach pitch for this business:\n",
+        "Write a professional outreach pitch for this business:\n",
         f"Business Name: {lead.get('business_name', 'Unknown')}",
         f"Category: {lead.get('category', 'N/A')}",
     ]
@@ -254,7 +254,7 @@ async def generate_website_message(
 
 def _build_website_message_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
     parts = [
-        f"Write a short WhatsApp outreach message for this business:\n",
+        "Write a short WhatsApp outreach message for this business:\n",
         f"Business Name: {lead.get('business_name', 'Unknown')}",
         f"Category: {lead.get('category', 'N/A')}",
     ]

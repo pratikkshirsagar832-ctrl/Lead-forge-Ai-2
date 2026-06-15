@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from app.config import get_settings
 from app.database import get_supabase_admin
@@ -18,8 +18,12 @@ router = APIRouter(prefix="/api/subscriptions", tags=["Subscriptions"])
 @router.get("/plans")
 async def list_plans():
     supabase = get_supabase_admin()
-    resp = supabase.table("plans").select("*").eq("is_active", True).order("sort_order").execute()
-    return {"plans": resp.data or []}
+    try:
+        resp = supabase.table("plans").select("*").eq("is_active", True).order("sort_order").execute()
+        return {"plans": resp.data or []}
+    except Exception as e:
+        logger.error(f"Failed to fetch plans: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch plans")
 
 
 @router.get("/current")
@@ -137,9 +141,9 @@ async def create_order(
             },
         })
 
-        existing_sub = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).maybe_single().execute()
+        existing_sub = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).limit(1).execute()
 
-        if existing_sub.data:
+        if existing_sub.data and len(existing_sub.data) > 0:
             supabase.table("user_subscriptions").update({
                 "razorpay_order_id": order["id"],
             }).eq("user_id", current_user["id"]).execute()
@@ -204,7 +208,7 @@ async def verify_payment(
     now = datetime.now(timezone.utc)
     period_end = now + timedelta(days=30)
 
-    existing = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).maybe_single().execute()
+    existing = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).limit(1).execute()
 
     sub_data = {
         "plan_id": plan_id,
@@ -214,7 +218,7 @@ async def verify_payment(
         "current_period_end": period_end.isoformat(),
     }
 
-    if existing.data:
+    if existing.data and len(existing.data) > 0:
         supabase.table("user_subscriptions").update(sub_data).eq("user_id", current_user["id"]).execute()
     else:
         sub_data["user_id"] = current_user["id"]
@@ -264,18 +268,23 @@ async def razorpay_webhook(request: Request):
 
         logger.info(f"Razorpay webhook: {event_type}")
 
+        supabase = get_supabase_admin()
+
         if event_type == "payment.captured":
             order_id = payload.get("payment", {}).get("entity", {}).get("order_id", "")
-            if order_id:
-                supabase = get_supabase_admin()
-                supabase.table("user_subscriptions").update({
-                    "status": "active",
-                }).eq("razorpay_order_id", order_id).execute()
+            payment_id = payload.get("payment", {}).get("entity", {}).get("id", "")
+            if order_id and payment_id:
+                # Idempotency check: skip if payment already processed
+                existing = supabase.table("user_subscriptions").select("id").eq("razorpay_order_id", order_id).limit(1).execute()
+                sub_data = existing.data[0] if existing.data and len(existing.data) > 0 else None
+                if sub_data:
+                    supabase.table("user_subscriptions").update({
+                        "status": "active",
+                    }).eq("id", sub_data["id"]).execute()
 
         elif event_type == "subscription.charged":
             sub_id = payload.get("subscription", {}).get("entity", {}).get("id", "")
             if sub_id:
-                supabase = get_supabase_admin()
                 supabase.table("user_subscriptions").update({
                     "status": "active",
                 }).eq("razorpay_subscription_id", sub_id).execute()
@@ -290,9 +299,12 @@ async def razorpay_webhook(request: Request):
 async def cancel_subscription(current_user: dict = Depends(get_current_user)):
     supabase = get_supabase_admin()
 
-    supabase.table("user_subscriptions").update({
-        "status": "cancelled",
-        "cancelled_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("user_id", current_user["id"]).execute()
-
-    return {"status": "cancelled", "message": "Subscription cancelled"}
+    try:
+        supabase.table("user_subscriptions").update({
+            "status": "cancelled",
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("user_id", current_user["id"]).execute()
+        return {"status": "cancelled", "message": "Subscription cancelled"}
+    except Exception as e:
+        logger.error(f"Failed to cancel subscription: {e}")
+        raise HTTPException(status_code=500, detail="Failed to cancel subscription")

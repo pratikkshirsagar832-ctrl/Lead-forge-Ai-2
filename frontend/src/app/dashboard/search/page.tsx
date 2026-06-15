@@ -118,7 +118,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     resumePollingIfActive();
-    api.get('/api/auth/me').then(r => setSubscription(r.data?.subscription)).catch(() => {});
+    api.get('/api/auth/me').then(r => setSubscription(r.data?.subscription)).catch(e => console.error('Failed to fetch subscription:', e));
   }, [resumePollingIfActive]);
 
   const remaining = subscription?.remaining_searches ?? 1;
@@ -130,7 +130,7 @@ export default function SearchPage() {
     await startSearch(data.niche, data.location);
   };
 
-  const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status);
+  const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -280,7 +280,7 @@ export default function SearchPage() {
               )}
             </>
           )}
-          {!isSearchActive && progress && ['completed', 'failed', 'cancelled'].includes(progress.status) && (
+          {!isSearchActive && progress && ['completed', 'failed', 'cancelled'].includes(progress.status ?? '') && (
             <div className="flex justify-center mt-6">
               <button
                 onClick={() => { clearActiveSearch(); }}

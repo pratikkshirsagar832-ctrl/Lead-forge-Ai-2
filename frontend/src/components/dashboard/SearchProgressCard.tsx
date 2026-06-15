@@ -22,12 +22,10 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
 
   if (!progress) return null;
 
-  const statusConfig = SEARCH_STATUSES[progress.status as keyof typeof SEARCH_STATUSES] || SEARCH_STATUSES.queued;
-  const isFinished = ['completed', 'failed', 'cancelled'].includes(progress.status);
+  const statusConfig = SEARCH_STATUSES[(progress.status ?? 'queued') as keyof typeof SEARCH_STATUSES] || SEARCH_STATUSES.queued;
+  const isFinished = ['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
 
-  const totalStages = 5;
-  const currentStage = progress.stage || 0;
-  const percentage = isFinished ? 100 : Math.max(5, (currentStage / totalStages) * 100);
+  const percentage = isFinished ? 100 : Math.max(5, progress.progress_percent || 0);
 
   const [localElapsed, setLocalElapsed] = useState(progress.elapsed_seconds || 0);
 

@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 from scrapling import AsyncFetcher
-from app.config import get_settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,6 @@ async def analyze_website(url: str) -> dict[str, Any]:
     twitter_values: dict[str, str] = {}
     schema_data: list[dict] = []
     pages_crawled: list[str] = []
-    page_contents: dict[str, str] = {}
 
     def add_deduction(reason: str, pts: int, severity: str = "medium"):
         deductions.append({"reason": reason, "points": -pts, "severity": severity})

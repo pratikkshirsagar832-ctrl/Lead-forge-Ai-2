@@ -27,12 +27,12 @@ interface ScoreBreakdownProps {
   breakdown: ScoreBreakdownData;
 }
 
-const severityConfig: Record<string, { icon: typeof AlertCircle; color: string; bg: string; label: string }> = {
-  critical: { icon: XCircle, color: 'text-rose-400', bg: 'bg-rose-500/10', label: 'Critical' },
-  major: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'Major' },
-  medium: { icon: AlertCircle, color: 'text-yellow-400', bg: 'bg-yellow-500/10', label: 'Medium' },
-  minor: { icon: AlertCircle, color: 'text-ice/60', bg: 'bg-ice/10', label: 'Minor' },
-  bonus: { icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Bonus' },
+const severityConfig: Record<string, { icon: typeof AlertCircle; color: string; bg: string; border: string; label: string }> = {
+  critical: { icon: XCircle, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', label: 'Critical' },
+  major: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: 'Major' },
+  medium: { icon: AlertCircle, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', label: 'Medium' },
+  minor: { icon: AlertCircle, color: 'text-ice/60', bg: 'bg-ice/10', border: 'border-ice/20', label: 'Minor' },
+  bonus: { icon: CheckCircle, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: 'Bonus' },
 };
 
 export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownProps) {
@@ -81,8 +81,7 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
                   className={cn(
                     'flex items-start gap-2.5 p-2.5 rounded-lg border',
                     cfg.bg,
-                    `border-${item.severity === 'critical' ? 'rose' : item.severity === 'major' ? 'amber' : 'ice'}/20`,
-                    `animate-fade-in-up animate-delay-${Math.min(i * 100, 500)}`
+                    cfg.border,
                   )}
                 >
                   <Icon className={cn('w-4 h-4 shrink-0 mt-0.5', cfg.color)} />

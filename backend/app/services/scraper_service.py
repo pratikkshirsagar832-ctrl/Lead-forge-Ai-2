@@ -166,13 +166,13 @@ async def run_maps_scraper(
         
         return results
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         logger.error(f"[Scraper:{run_id}] Binary not found at: {scraper_path}")
         logger.error(f"[Scraper:{run_id}] Absolute path would be: {Path(scraper_path).resolve()}")
         logger.error(f"[Scraper:{run_id}] Current working directory: {os.getcwd()}")
         logger.error(f"[Scraper:{run_id}] OS type: {os.name}")
         raise RuntimeError(f"Scraper binary not found at: {scraper_path}")
-    except PermissionError as e:
+    except PermissionError:
         logger.error(f"[Scraper:{run_id}] Permission denied: {scraper_path}")
         logger.error(f"[Scraper:{run_id}] File mode: {oct(os.stat(scraper_path).st_mode) if os.path.exists(scraper_path) else 'N/A'}")
         raise RuntimeError(f"Scraper binary is not executable: {scraper_path}")
@@ -199,7 +199,7 @@ def _parse_csv_results(output_file: str, max_results: int) -> list[dict]:
     """
     if not os.path.exists(output_file):
         logger.warning(f"Output file does not exist: {output_file}")
-        raise RuntimeError(f"Scraper returned no data: output CSV missing.")
+        raise RuntimeError("Scraper returned no data: output CSV missing.")
     
     if os.path.getsize(output_file) == 0:
         logger.warning(f"Output file is completely empty: {output_file}")
@@ -210,7 +210,7 @@ def _parse_csv_results(output_file: str, max_results: int) -> list[dict]:
                 logger.warning(f"Empty CSV content: '{content}'")
         except Exception as e:
             logger.error(f"Could not read empty CSV: {e}")
-        raise RuntimeError(f"Scraper returned no data: output CSV empty.")
+        raise RuntimeError("Scraper returned no data: output CSV empty.")
 
     results = []
     raw_count = 0

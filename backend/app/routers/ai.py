@@ -38,15 +38,15 @@ async def generate_lead_pitch(
             .select("*")
             .eq("id", lead_id)
             .eq("user_id", user_id)
-            .single()
+            .limit(1)
             .execute()
         )
-        if not lead_resp.data:
+        if not lead_resp.data or len(lead_resp.data) == 0:
             raise HTTPException(status_code=404, detail="Lead not found")
-        lead = lead_resp.data
+        lead = lead_resp.data[0]
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404, detail="Lead not found")
 
     # Fetch website analysis if available
@@ -61,8 +61,8 @@ async def generate_lead_pitch(
         )
         if analysis_resp.data:
             analysis = analysis_resp.data[0]
-    except Exception:
-        pass  # Not critical — pitch can be generated without analysis
+    except Exception as fetch_err:
+        logger.warning(f"Failed to fetch website analysis for lead {lead_id}: {fetch_err}")
 
     # Generate pitch
     result = await generate_pitch(lead=lead, analysis=analysis)
@@ -104,15 +104,15 @@ async def generate_lead_website_message(
             .select("*")
             .eq("id", lead_id)
             .eq("user_id", user_id)
-            .single()
+            .limit(1)
             .execute()
         )
-        if not lead_resp.data:
+        if not lead_resp.data or len(lead_resp.data) == 0:
             raise HTTPException(status_code=404, detail="Lead not found")
-        lead = lead_resp.data
+        lead = lead_resp.data[0]
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=404, detail="Lead not found")
 
     analysis = None
@@ -126,8 +126,8 @@ async def generate_lead_website_message(
         )
         if analysis_resp.data:
             analysis = analysis_resp.data[0]
-    except Exception:
-        pass
+    except Exception as fetch_err:
+        logger.warning(f"Failed to fetch website analysis for lead {lead_id}: {fetch_err}")
 
     result = await generate_website_message(lead=lead, analysis=analysis)
 

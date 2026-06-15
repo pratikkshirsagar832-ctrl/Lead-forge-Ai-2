@@ -86,12 +86,11 @@ async def create_search(
 
 
 @router.get("/scraper-health")
-async def scraper_health_check():
+async def scraper_health_check(current_user: dict = Depends(get_current_user)):
     """Check if scraper binary exists and is executable."""
     from app.config import get_settings
     from app.services.scraper_service import _get_scraper_path
     import os
-    import stat
 
     settings = get_settings()
     scraper_path = _get_scraper_path()
@@ -250,12 +249,12 @@ async def get_search_status(
         created_dt = None
         if row.get("created_at"):
             try: created_dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-            except: logger.warning(f"Failed to parse created_at: {row.get('created_at')}")
+            except Exception: logger.warning(f"Failed to parse created_at: {row.get('created_at')}")
             
         comp_dt = None
         if row.get("completed_at"):
             try: comp_dt = datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00"))
-            except: logger.warning(f"Failed to parse completed_at: {row.get('completed_at')}")
+            except Exception: logger.warning(f"Failed to parse completed_at: {row.get('completed_at')}")
 
         elapsed = 0
         if created_dt:
@@ -339,7 +338,7 @@ class DebugSearchRequest(BaseModel):
     location: str
 
 @router.post("/debug/test-scraper")
-async def debug_test_scraper(request: DebugSearchRequest):
+async def debug_test_scraper(request: DebugSearchRequest, current_user: dict = Depends(get_current_user)):
     from app.config import get_settings
     settings = get_settings()
     if settings.is_production:
@@ -390,7 +389,7 @@ async def debug_test_scraper(request: DebugSearchRequest):
             "output_size": output_size,
             "output_preview": output_preview
         }
-    except subprocess.TimeoutExpired as e:
+    except subprocess.TimeoutExpired:
         # Still try to read partial results on timeout
         output_preview = ""
         try:
@@ -401,11 +400,11 @@ async def debug_test_scraper(request: DebugSearchRequest):
             pass
         return {
             "success": False,
-            "error": f"Timed out after 180s",
+            "error": "Timed out after 180s",
             "partial_output": output_preview
         }
-    except Exception as e:
-        return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
+    except Exception as err:
+        return {"success": False, "error": f"{type(err).__name__}: {str(err)}"}
     finally:
         try: os.remove(input_path)
         except OSError as e: logger.warning(f"Failed to remove temp input: {e}")

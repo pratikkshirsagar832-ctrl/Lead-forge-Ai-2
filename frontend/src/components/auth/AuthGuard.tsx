@@ -26,7 +26,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
         setIsAuthenticated(true);
         setIsLoading(false);
-      } catch {
+      } catch (err) {
+        console.error('AuthGuard: session check failed', err);
         if (mounted) router.replace('/login');
       } finally {
         if (mounted) setIsLoading(false);

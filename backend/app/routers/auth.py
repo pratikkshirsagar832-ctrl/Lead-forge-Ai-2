@@ -1,7 +1,7 @@
 import logging
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app.database import get_supabase_admin
 from app.middleware.auth_middleware import get_current_user
@@ -41,10 +41,10 @@ async def get_me(current_user: dict = Depends(get_current_user)):
                 plan_resp = supabase.table("plans") \
                     .select("*") \
                     .eq("id", plan_id) \
-                    .single() \
+                    .limit(1) \
                     .execute()
 
-                plan = plan_resp.data if plan_resp.data else {}
+                plan = plan_resp.data[0] if plan_resp.data and len(plan_resp.data) > 0 else {}
                 today_str = date.today().isoformat()
 
                 usage_resp = supabase.table("daily_usage") \

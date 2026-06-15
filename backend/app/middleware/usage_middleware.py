@@ -16,7 +16,7 @@ async def check_search_limit(current_user: dict = Depends(get_current_user)) -> 
         plan_max = 0
         plan_name = "Free"
 
-        sub_resp = supabase.table("user_subscriptions").select("plan_id, status").eq("user_id", user_id).execute()
+        sub_resp = supabase.table("user_subscriptions").select("plan_id, status").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
         if sub_resp.data and len(sub_resp.data) > 0:
             sub = sub_resp.data[0]
             plan_id = sub.get("plan_id", "free")

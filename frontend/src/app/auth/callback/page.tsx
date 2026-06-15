@@ -21,10 +21,12 @@ export default function AuthCallbackPage() {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted && session) {
+    supabase.auth.getSession().then((result) => {
+      if (mounted && result.data?.session) {
         router.replace('/dashboard');
       }
+    }).catch((err) => {
+      console.error('Auth callback: getSession error', err);
     });
 
     const timeout = setTimeout(() => {

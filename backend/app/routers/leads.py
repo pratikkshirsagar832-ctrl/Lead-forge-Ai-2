@@ -10,7 +10,6 @@ Endpoints:
   PATCH  /api/leads/{id}/favorite — toggle favorite
 """
 
-import asyncio
 import csv
 import io
 import logging
@@ -19,7 +18,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.database import get_supabase_admin

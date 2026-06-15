@@ -152,7 +152,7 @@ export function useSearch() {
   };
 
   const resumePollingIfActive = useCallback(() => {
-    if (activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status)) {
+    if (activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '')) {
       clearPolling();
       resultsPageRef.current = 1;
       retryCountRef.current = 0;
