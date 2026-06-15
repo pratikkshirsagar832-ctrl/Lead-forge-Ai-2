@@ -5,7 +5,7 @@
 # ==========================================
 
 # ── Stage 1: Build google-maps-scraper from source ──
-FROM golang:1.23-bookworm AS go-builder
+FROM golang:1.26-bookworm AS go-builder
 
 WORKDIR /build
 COPY google-maps-scraper/ .
