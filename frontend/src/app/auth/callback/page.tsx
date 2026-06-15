@@ -11,28 +11,39 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     let mounted = true;
+    let completed = false;
+
+    const redirectToDashboard = () => {
+      if (completed) return;
+      completed = true;
+      router.replace('/dashboard');
+    };
+
+    const redirectToLogin = () => {
+      if (completed) return;
+      completed = true;
+      router.replace('/login');
+    };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
         if (event === 'SIGNED_IN' && session) {
-          router.replace('/dashboard');
+          redirectToDashboard();
         }
       }
     );
 
     supabase.auth.getSession().then((result) => {
       if (mounted && result.data?.session) {
-        router.replace('/dashboard');
+        redirectToDashboard();
       }
     }).catch((err) => {
       console.error('Auth callback: getSession error', err);
     });
 
     const timeout = setTimeout(() => {
-      if (mounted && !error) {
-        router.replace('/login');
-      }
+      if (mounted) redirectToLogin();
     }, 15000);
 
     return () => {
@@ -40,7 +51,7 @@ export default function AuthCallbackPage() {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [router, error]);
+  }, [router]);
 
   if (error) {
     return (

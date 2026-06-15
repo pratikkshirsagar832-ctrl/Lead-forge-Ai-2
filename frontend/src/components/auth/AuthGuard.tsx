@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
@@ -10,27 +10,49 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
+
+  const safeRedirect = (url: string) => {
+    if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    redirectTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) router.replace(url);
+    }, 1500);
+  };
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
 
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!mounted) return;
+        if (!mountedRef.current) return;
 
-        if (!session) {
-          router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+        if (session) {
+          setIsAuthenticated(true);
+          setIsLoading(false);
           return;
         }
 
-        setIsAuthenticated(true);
-        setIsLoading(false);
+        // Session not found — wait a moment for onAuthStateChange to fire
+        // (avoids redirect loop when login just completed but session isn't persisted yet)
+        redirectTimerRef.current = setTimeout(async () => {
+          if (!mountedRef.current) return;
+          try {
+            const { data: { session: retrySession } } = await supabase.auth.getSession();
+            if (retrySession) {
+              setIsAuthenticated(true);
+              setIsLoading(false);
+              return;
+            }
+          } catch {}
+          if (mountedRef.current) router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+        }, 3000);
       } catch (err) {
         console.error('AuthGuard: session check failed', err);
-        if (mounted) router.replace('/login');
+        safeRedirect('/login');
       } finally {
-        if (mounted) setIsLoading(false);
+        if (mountedRef.current) setIsLoading(false);
       }
     };
 
@@ -38,10 +60,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         if (event === 'SIGNED_OUT') {
-          router.replace('/login');
+          safeRedirect('/login');
         } else if (session) {
+          if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
           setIsAuthenticated(true);
           setIsLoading(false);
         }
@@ -49,7 +72,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       subscription.unsubscribe();
     };
   }, [router, pathname]);

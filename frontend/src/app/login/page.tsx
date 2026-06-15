@@ -43,12 +43,16 @@ export default function LoginPage() {
         return;
       }
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (signInError) throw signInError;
-      router.replace('/dashboard');
+      // Wait for session to be fully persisted before navigating
+      if (data?.session) {
+        await supabase.auth.getSession();
+        router.replace('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {
