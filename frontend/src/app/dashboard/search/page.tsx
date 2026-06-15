@@ -134,9 +134,19 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-bold text-offwhite tracking-tight">New Search</h1>
-        <p className="text-ice/60 mt-2">Find and qualify leads instantly from Google Maps.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-offwhite tracking-tight">New Search</h1>
+          <p className="text-ice/60 mt-2">Find and qualify leads instantly from Google Maps.</p>
+        </div>
+        {activeSearchId && (
+          <button
+            onClick={() => { clearActiveSearch(); }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all text-sm"
+          >
+            New Search
+          </button>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
