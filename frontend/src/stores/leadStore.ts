@@ -1,7 +1,8 @@
 import { create } from 'zustand';
+import type { LeadListItem } from '@/lib/types';
 
 interface LeadsState {
-  leads: any[];
+  leads: LeadListItem[];
   totalCount: number;
   filters: {
     status: string;
@@ -12,9 +13,9 @@ interface LeadsState {
     page: number;
     limit: number;
   };
-  setLeads: (leads: any[], totalCount: number) => void;
+  setLeads: (leads: LeadListItem[], totalCount: number) => void;
   setFilters: (filters: Partial<LeadsState['filters']>) => void;
-  updateLeadInStore: (id: string, updates: any) => void;
+  updateLeadInStore: (id: string, updates: Partial<LeadListItem>) => void;
 }
 
 export const useLeadStore = create<LeadsState>((set) => ({

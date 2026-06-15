@@ -54,7 +54,10 @@ async def check_search_limit(current_user: dict = Depends(get_current_user)) -> 
         raise
     except Exception as e:
         logger.error(f"Usage check error for user {user_id}: {e}")
-        return current_user
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to verify usage limits",
+        )
 
 
 async def increment_search_usage(user_id: str, leads_count: int = 0):

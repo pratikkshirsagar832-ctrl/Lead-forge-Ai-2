@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { SearchStatus, SearchHistoryItem } from '@/lib/types';
 
 export interface SearchResult {
   id: string;
@@ -17,26 +18,15 @@ export interface SearchResult {
 
 export interface SearchState {
   activeSearchId: string | null;
-  progress: {
-    status: string;
-    stage: number;
-    total_results?: number;
-    processed_count?: number;
-    hot_leads?: number;
-    warm_leads?: number;
-    skipped?: number;
-    message?: string;
-    elapsed_seconds: number;
-    started_at?: string;
-  } | null;
+  progress: SearchStatus | null;
   results: SearchResult[];
   resultsTotal: number;
-  history: any[];
+  history: SearchHistoryItem[];
   setActiveSearch: (id: string | null) => void;
-  setProgress: (progress: any) => void;
+  setProgress: (progress: SearchStatus | null) => void;
   setResults: (results: SearchResult[], total: number) => void;
   appendResults: (results: SearchResult[]) => void;
-  setHistory: (history: any[]) => void;
+  setHistory: (history: SearchHistoryItem[]) => void;
   clearActiveSearch: () => void;
 }
 

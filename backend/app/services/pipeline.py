@@ -123,8 +123,18 @@ async def run_search_pipeline(search_id: str, user_id: str, niche: str, location
 async def _save_leads(
     supabase, search_id: str, user_id: str, raw_results: list[dict]
 ) -> list[str]:
+    # Check remaining leads limit before saving
+    try:
+        rem_resp = supabase.rpc("get_remaining_leads", {"p_user_id": user_id}).execute()
+        remaining_leads = rem_resp.data if rem_resp and rem_resp.data is not None else 0
+    except Exception:
+        remaining_leads = 0
+
     lead_ids = []
     for result in raw_results:
+        if remaining_leads <= 0:
+            logger.warning(f"[Pipeline:{search_id}] Daily leads limit reached. Skipping {len(raw_results) - len(lead_ids)} remaining results.")
+            break
         try:
             has_website = bool(result.get("website_url"))
             lead_data = {
@@ -148,6 +158,7 @@ async def _save_leads(
             response = supabase.table("leads").insert(lead_data).execute()
             if response.data:
                 lead_ids.append(response.data[0]["id"])
+                remaining_leads -= 1  # decrement local counter after successful save
         except Exception as e:
             logger.error(f"Failed to save lead '{result.get('business_name', '?')}': {e}")
     return lead_ids

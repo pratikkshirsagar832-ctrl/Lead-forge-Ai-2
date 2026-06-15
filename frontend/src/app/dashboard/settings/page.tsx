@@ -1,14 +1,31 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/shared/GlassCard';
-import { User, Mail } from 'lucide-react';
-
-const DEFAULT_USER = {
-  name: 'Default User',
-  email: 'default@local.dev',
-};
+import { supabase } from '@/lib/supabase';
+import { User, Mail, Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
+  const [user, setUser] = useState<{ email?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      setUser(u);
+      setIsLoading(false);
+    };
+    fetchUser();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-steel animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
@@ -26,16 +43,6 @@ export default function SettingsPage() {
 
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-ice/70 mb-2">Full Name</label>
-                <input
-                  type="text"
-                  disabled
-                  value={DEFAULT_USER.name}
-                  className="w-full px-4 py-2.5 rounded-xl border border-ocean/50 bg-navy/80 text-ice/60 cursor-not-allowed"
-                />
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium text-ice/70 mb-2">Email Address</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -44,7 +51,7 @@ export default function SettingsPage() {
                   <input
                     type="email"
                     disabled
-                    value={DEFAULT_USER.email}
+                    value={user?.email || ''}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-ocean/50 bg-navy/80 text-ice/60 cursor-not-allowed"
                   />
                 </div>

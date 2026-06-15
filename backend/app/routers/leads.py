@@ -179,13 +179,13 @@ async def analyze_lead_website(
             .select("id, website_url, business_name, lead_category")
             .eq("id", lead_id)
             .eq("user_id", current_user["id"])
-            .single()
+            .limit(1)
             .execute()
         )
-        if not lead_resp.data:
+        if not lead_resp.data or len(lead_resp.data) == 0:
             raise HTTPException(status_code=404, detail="Lead not found")
 
-        lead = lead_resp.data
+        lead = lead_resp.data[0]
         url = lead.get("website_url", "")
         if not url:
             raise HTTPException(status_code=400, detail="Lead has no website URL")
@@ -238,13 +238,13 @@ async def get_lead_detail(
             .select("*")
             .eq("id", lead_id)
             .eq("user_id", current_user["id"])
-            .single()
+            .limit(1)
             .execute()
         )
-        if not response.data:
+        if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Lead not found")
 
-        lead = response.data
+        lead = response.data[0]
 
         # Fetch associated website analyses
         try:

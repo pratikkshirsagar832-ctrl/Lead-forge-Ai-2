@@ -40,7 +40,8 @@ export function useSearch() {
         resultsPageRef.current += 1;
       }
       resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
-    } catch {
+    } catch (e) {
+      console.warn('Poll results failed, retrying:', e);
       resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
     }
   }, [appendResults]);
@@ -57,7 +58,9 @@ export function useSearch() {
           if (finalResults.items) {
             appendResults(finalResults.items);
           }
-        } catch {}
+        } catch (e) {
+          console.warn('Failed to fetch final results:', e);
+        }
         if (data.status === 'completed') {
           showToast(`Search completed: ${data.total_results || 0} leads found.`, 'success');
         } else if (data.status === 'failed') {
@@ -92,7 +95,10 @@ export function useSearch() {
   useEffect(() => {
     pollStatusRef.current = pollStatus;
     pollResultsRef.current = pollResults;
-  }, [pollStatus, pollResults]);
+    return () => {
+      clearPolling();
+    };
+  }, [pollStatus, pollResults, clearPolling]);
 
   const startSearch = async (niche: string, location: string) => {
     try {

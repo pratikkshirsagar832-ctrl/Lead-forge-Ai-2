@@ -48,7 +48,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         if (resp.data?.subscription) {
           setSubscription(resp.data.subscription);
         }
-      } catch {}
+      } catch (e) {
+        console.error('Failed to fetch subscription:', e);
+      }
     };
     fetchUser();
   }, []);
@@ -66,6 +68,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
 
   const remaining = subscription?.remaining_searches ?? 1;
   const searchesPerDay = subscription?.searches_per_day ?? 1;
+  const leadsRemaining = subscription?.remaining_leads ?? 0;
+  const leadsPerDay = subscription?.leads_per_day ?? 30;
 
   return (
     <>
@@ -114,8 +118,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {/* User section */}
         <div className="p-4 border-t border-ocean/40 space-y-3">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet to-steel flex items-center justify-center text-xs font-bold text-offwhite shrink-0">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet to-steel flex items-center justify-center text-xs font-bold text-offwhite shrink-0 overflow-hidden">
+              <img
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.email || 'U')}&background=6366f1&color=fff&size=32&bold=true`}
+                alt=""
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-offwhite truncate">{user?.email || 'User'}</p>
@@ -135,6 +143,20 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
                 <div
                   className={cn('h-full rounded-full transition-all', remaining > 0 ? 'bg-steel' : 'bg-rose-500')}
                   style={{ width: `${Math.min(100, ((searchesPerDay - remaining) / searchesPerDay) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {leadsPerDay > 0 && (
+            <div className="px-2">
+              <div className="flex justify-between text-[10px] text-ice/50 mb-1">
+                <span>Leads today</span>
+                <span>{leadsPerDay - leadsRemaining}/{leadsPerDay}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-ocean/30 overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all', leadsRemaining > 0 ? 'bg-emerald-500' : 'bg-rose-500')}
+                  style={{ width: `${Math.min(100, ((leadsPerDay - leadsRemaining) / leadsPerDay) * 100)}%` }}
                 />
               </div>
             </div>

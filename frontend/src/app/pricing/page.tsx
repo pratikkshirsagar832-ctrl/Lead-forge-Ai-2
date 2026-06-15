@@ -52,7 +52,9 @@ export default function PricingPage() {
           if (resp.data?.subscription) {
             setCurrentPlan(resp.data.subscription.plan_id);
           }
-        } catch {}
+        } catch (e) {
+          console.error('Failed to fetch current subscription:', e);
+        }
       }
       setIsLoading(false);
     };

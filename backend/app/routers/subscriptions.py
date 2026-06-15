@@ -53,10 +53,10 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
             plan_resp = supabase.table("plans") \
                 .select("*") \
                 .eq("id", plan_id) \
-                .single() \
+                .limit(1) \
                 .execute()
 
-            plan = plan_resp.data if plan_resp.data else {}
+            plan = plan_resp.data[0] if plan_resp.data and len(plan_resp.data) > 0 else {}
 
             from datetime import date
             today = date.today().isoformat()
@@ -115,11 +115,11 @@ async def create_order(
         client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
 
         supabase = get_supabase_admin()
-        plan_resp = supabase.table("plans").select("*").eq("id", plan_id).single().execute()
-        if not plan_resp.data:
+        plan_resp = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
+        if not plan_resp.data or len(plan_resp.data) == 0:
             raise HTTPException(status_code=404, detail="Plan not found")
 
-        plan = plan_resp.data
+        plan = plan_resp.data[0]
         amount = plan["price_monthly"]
 
         if amount <= 0:
@@ -195,11 +195,11 @@ async def verify_payment(
 
     supabase = get_supabase_admin()
 
-    plan_resp = supabase.table("plans").select("*").eq("id", plan_id).single().execute()
-    if not plan_resp.data:
+    plan_resp = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
+    if not plan_resp.data or len(plan_resp.data) == 0:
         raise HTTPException(status_code=404, detail="Plan not found")
 
-    plan = plan_resp.data
+    plan = plan_resp.data[0]
 
     now = datetime.now(timezone.utc)
     period_end = now + timedelta(days=30)

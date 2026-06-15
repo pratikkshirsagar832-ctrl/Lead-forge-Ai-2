@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type ElementType } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import api from '@/lib/api';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { LoadingButton } from '@/components/shared/LoadingButton';
+import type { SubscriptionInfo, Plan } from '@/lib/types';
 import {
   CreditCard, Check, ArrowLeft, Zap, Star, Building2,
   Loader2, AlertCircle, ExternalLink, Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 
-const PLAN_META: Record<string, { name: string; icon: any; color: string; bg: string }> = {
+const PLAN_META: Record<string, { name: string; icon: ElementType; color: string; bg: string }> = {
   free: { name: 'Free', icon: Zap, color: 'text-ice/60', bg: 'bg-ocean/20' },
   solo: { name: 'Solo', icon: Star, color: 'text-sky-400', bg: 'bg-sky-500/10' },
   pro: { name: 'Pro', icon: Star, color: 'text-violet', bg: 'bg-violet/20' },
@@ -21,8 +22,8 @@ const PLAN_META: Record<string, { name: string; icon: any; color: string; bg: st
 
 export default function BillingPage() {
   const searchParams = useSearchParams();
-  const [subscription, setSubscription] = useState<any>(null);
-  const [plans, setPlans] = useState<any[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
@@ -37,8 +38,8 @@ export default function BillingPage() {
       ]);
       setSubscription(subResp.data);
       setPlans(plansResp.data?.plans || []);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : detail?.message || 'Failed to load billing data');
     } finally {
       setIsLoading(false);
@@ -60,9 +61,20 @@ export default function BillingPage() {
     }
   }, [searchParams, plans, subscription?.plan_id]);
 
-  const handleUpgrade = async (plan: any) => {
+  interface RazorpayResponse {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }
+
+  interface RazorpayError {
+    error?: { description?: string };
+  }
+
+  const handleUpgrade = async (plan: Plan) => {
     if (plan.price_monthly <= 0) return;
-    if (typeof (window as any).Razorpay === 'undefined') {
+    const Razorpay = (window as Record<string, unknown>).Razorpay as { new(options: Record<string, unknown>): { on: (event: string, handler: (response: unknown) => void) => void; open: () => void } } | undefined;
+    if (!Razorpay) {
       setError('Payment gateway not loaded. Please refresh the page.');
       return;
     }
@@ -71,7 +83,7 @@ export default function BillingPage() {
 
     try {
       const orderResp = await api.post('/api/subscriptions/create-order', { plan_id: plan.id });
-      const order = orderResp.data;
+      const order = orderResp.data as { key_id: string; amount: number; currency: string; plan_name: string; order_id: string };
 
       const options = {
         key: order.key_id,
@@ -82,18 +94,19 @@ export default function BillingPage() {
         order_id: order.order_id,
         prefill: { email: (await supabase.auth.getUser()).data.user?.email },
         theme: { color: '#6366f1' },
-        handler: async (response: any) => {
+        handler: async (response: unknown) => {
+          const r = response as RazorpayResponse;
           try {
             await api.post('/api/subscriptions/verify', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
+              razorpay_order_id: r.razorpay_order_id,
+              razorpay_payment_id: r.razorpay_payment_id,
+              razorpay_signature: r.razorpay_signature,
               plan_id: plan.id,
             });
             setSuccess(`Upgraded to ${plan.name} plan successfully!`);
             loadData();
-          } catch (err: any) {
-            const detail = err.response?.data?.detail;
+          } catch (err) {
+            const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
             setError(typeof detail === 'string' ? detail : detail?.message || 'Payment verification failed');
           } finally {
             setIsProcessing(false);
@@ -104,14 +117,15 @@ export default function BillingPage() {
         },
       };
 
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', (response: any) => {
-        setError(response.error?.description || 'Payment failed');
+      const rzp = new Razorpay(options);
+      rzp.on('payment.failed', (response: unknown) => {
+        const errResp = response as RazorpayError;
+        setError(errResp.error?.description || 'Payment failed');
         setIsProcessing(false);
       });
       rzp.open();
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : detail?.message || 'Failed to start upgrade');
       setIsProcessing(false);
     }
@@ -201,10 +215,13 @@ export default function BillingPage() {
           <div>
             <div className="flex justify-between text-xs text-ice/50 mb-1">
               <span>Leads / day limit</span>
-              <span>{subscription?.leads_per_day || 10}</span>
+              <span>{subscription?.leads_per_day ? (subscription.leads_per_day - (subscription.remaining_leads || 0)) : 0} / {subscription?.leads_per_day || 30}</span>
             </div>
             <div className="h-2 rounded-full bg-ocean/30 overflow-hidden">
-              <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: '0%' }} />
+              <div
+                className="h-full rounded-full bg-emerald-400 transition-all"
+                style={{ width: `${subscription?.leads_per_day ? ((subscription.leads_per_day - (subscription.remaining_leads || 0)) / subscription.leads_per_day) * 100 : 0}%` }}
+              />
             </div>
           </div>
         </div>

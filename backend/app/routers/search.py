@@ -11,14 +11,17 @@ Endpoints:
 
 from datetime import datetime, timezone
 
+import logging
 import math
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 from app.database import get_supabase_admin
 from app.middleware.auth_middleware import get_current_user
-from app.middleware.usage_middleware import check_search_limit, increment_search_usage
+from app.middleware.usage_middleware import check_search_limit
 from app.schemas.search import (
     SearchCreateRequest,
     SearchHistoryItem,
@@ -50,6 +53,17 @@ async def create_search(
         "message": "Search queued",
     }
 
+    # Increment usage synchronously BEFORE creating search
+    # This prevents race conditions (limit check → usage increment gap)
+    try:
+        supabase.rpc("increment_daily_usage", {
+            "p_user_id": user_id,
+            "p_searches": 1,
+            "p_leads": 0,
+        }).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record usage: {str(e)}")
+
     try:
         response = supabase.table("searches").insert(search_data).execute()
         if not response.data:
@@ -66,12 +80,6 @@ async def create_search(
         user_id=user_id,
         niche=request.niche.strip(),
         location=request.location.strip(),
-    )
-
-    background_tasks.add_task(
-        increment_search_usage,
-        user_id=user_id,
-        leads_count=0,
     )
 
     return search
@@ -223,9 +231,6 @@ async def get_search_status(
     current_user: dict = Depends(get_current_user),
 ):
     """Get search status for polling (lightweight response)."""
-    print(f"[DEBUG] Entered get_search_status")
-    print(f"[DEBUG] search_id: {search_id}")
-    print(f"[DEBUG] current_user_id: {current_user['id']}")
     supabase = get_supabase_admin()
 
     try:
@@ -237,7 +242,6 @@ async def get_search_status(
             .limit(1)
             .execute()
         )
-        print(f"[DEBUG] Supabase raw result.data: {response.data}")
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Search not found")
             
