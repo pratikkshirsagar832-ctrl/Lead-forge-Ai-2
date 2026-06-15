@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
+import razorpay
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 
 from app.config import get_settings
@@ -114,8 +115,6 @@ async def create_order(
         raise HTTPException(status_code=500, detail="Payments not configured")
 
     try:
-        import razorpay
-
         client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
 
         supabase = get_supabase_admin()
@@ -166,8 +165,6 @@ async def create_order(
 
     except HTTPException:
         raise
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Razorpay SDK not installed")
     except Exception as e:
         logger.error(f"Failed to create order: {e}")
         raise HTTPException(status_code=500, detail="Failed to create payment order")

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Space_Grotesk, DM_Sans } from 'next/font/google';
+import { Inter, Space_Grotesk } from 'next/font/google';
 import Script from 'next/script';
 import '../styles/globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
@@ -8,7 +8,7 @@ import { AnimatedBackground } from '@/components/AnimatedBackground';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-heading', weight: ['400', '500', '600', '700'] });
-const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-body', weight: ['400', '500', '700'] });
+
 
 export const metadata: Metadata = {
   title: 'Hyperclients',
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <body className={`${inter.className} ${spaceGrotesk.variable} ${dmSans.variable} min-h-screen bg-navy text-ice antialiased`}>
+      <body className={`${inter.className} ${spaceGrotesk.variable} min-h-screen bg-navy text-ice antialiased`}>
           <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         <ThemeProvider
           attribute="class"
