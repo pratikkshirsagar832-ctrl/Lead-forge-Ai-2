@@ -5,11 +5,12 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSearch } from '@/hooks/useSearch';
+import api from '@/lib/api';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
-import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users } from 'lucide-react';
+import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { LEAD_CATEGORIES } from '@/lib/constants';
@@ -104,18 +105,27 @@ export default function SearchPage() {
     isCancelling,
     startSearch,
     cancelSearch,
-    resumePollingIfActive
+    resumePollingIfActive,
+    clearActiveSearch
   } = useSearch();
 
   const { register, handleSubmit, formState: { errors } } = useForm<SearchSchema>({
     resolver: zodResolver(searchSchema),
   });
 
+  const [subscription, setSubscription] = useState<any>(null);
+
   useEffect(() => {
     resumePollingIfActive();
+    api.get('/api/auth/me').then(r => setSubscription(r.data?.subscription)).catch(() => {});
   }, [resumePollingIfActive]);
 
+  const remaining = subscription?.remaining_searches ?? 1;
+  const searchesPerDay = subscription?.searches_per_day ?? 1;
+  const isAtLimit = remaining <= 0;
+
   const onSubmit = async (data: SearchSchema) => {
+    if (isAtLimit) return;
     await startSearch(data.niche, data.location);
   };
 
@@ -177,24 +187,39 @@ export default function SearchPage() {
                   </div>
                 </div>
 
-                <div className="bg-steel/10 p-4 rounded-xl border border-steel/20 flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-steel shrink-0 mt-0.5" />
-                  <p className="text-sm text-ice/80 leading-relaxed">
-                    Hyperclients will scrape Google Maps for <span className="font-semibold px-1 text-offwhite">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
-                  </p>
-                </div>
+                {isAtLimit ? (
+                  <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/30 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-rose-300 font-semibold">Daily search limit reached</p>
+                      <p className="text-xs text-rose-400/80 mt-1">You've used all {searchesPerDay} searches today. Upgrade your plan or wait until tomorrow.</p>
+                      <Link href="/dashboard/billing" className="text-xs text-steel hover:underline mt-2 inline-block">Upgrade Plan →</Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-steel/10 p-4 rounded-xl border border-steel/20 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-steel shrink-0 mt-0.5" />
+                    <p className="text-sm text-ice/80 leading-relaxed">
+                      Hyperclients will scrape Google Maps for <span className="font-semibold px-1 text-offwhite">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
+                    </p>
+                  </div>
+                )}
 
-                <div className="pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-ice/40">
+                    {remaining}/{searchesPerDay} searches remaining today
+                  </span>
                   <LoadingButton
                     type="submit"
                     isLoading={isStarting}
                     size="lg"
-                    fullWidth
-                    variant="gradient"
-                    className="text-lg py-4"
+                    fullWidth={false}
+                    variant={isAtLimit ? "outline" : "gradient"}
+                    className="text-lg py-4 px-8"
+                    disabled={isAtLimit}
                   >
                     <SearchIcon className="w-5 h-5" />
-                    Start Search Pipeline
+                    Start Search
                   </LoadingButton>
                 </div>
               </form>
@@ -237,16 +262,32 @@ export default function SearchPage() {
                 ))}
               </div>
               {!isSearchActive && resultsTotal > 0 && (
-                <div className="flex justify-center mt-6">
+                <div className="flex justify-center mt-6 gap-4">
                   <Link
                     href="/dashboard/leads"
                     className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-offwhite bg-gradient-to-r from-steel to-ocean hover:from-steel/90 hover:to-ocean/90 transition-all shadow-[0_0_20px_rgba(74,127,167,0.4)] hover:shadow-[0_0_30px_rgba(74,127,167,0.6)]"
                   >
                     View All Leads in Dashboard
                   </Link>
+                  <button
+                    onClick={() => { clearActiveSearch(); }}
+                    className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all"
+                  >
+                    New Search
+                  </button>
                 </div>
               )}
             </>
+          )}
+          {!isSearchActive && progress && ['completed', 'failed', 'cancelled'].includes(progress.status) && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => { clearActiveSearch(); }}
+                className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all"
+              >
+                New Search
+              </button>
+            </div>
           )}
         </motion.div>
       )}

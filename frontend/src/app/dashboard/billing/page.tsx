@@ -40,7 +40,7 @@ export default function BillingPage() {
       setPlans(plansResp.data?.plans || []);
     } catch (err) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : detail?.message || 'Failed to load billing data');
+      setError(typeof detail === 'string' ? detail : 'Failed to load billing data');
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +107,7 @@ export default function BillingPage() {
             loadData();
           } catch (err) {
             const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-            setError(typeof detail === 'string' ? detail : detail?.message || 'Payment verification failed');
+            setError(typeof detail === 'string' ? detail : 'Payment verification failed');
           } finally {
             setIsProcessing(false);
           }
@@ -126,7 +126,7 @@ export default function BillingPage() {
       rzp.open();
     } catch (err) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : detail?.message || 'Failed to start upgrade');
+      setError(typeof detail === 'string' ? detail : 'Failed to start upgrade');
       setIsProcessing(false);
     }
   };

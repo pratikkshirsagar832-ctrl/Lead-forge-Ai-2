@@ -56,12 +56,10 @@ export function ScoreBreakdown({ score, category, breakdown }: ScoreBreakdownPro
           <p className="text-xs font-medium text-ice/60 mt-0.5">{categoryLabel}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-ice/50">How it&apos;s calculated</p>
-          <p className="text-sm font-mono text-ice/70 mt-1 leading-relaxed">
-            <span className="text-offwhite">100</span>
-            <span className="text-rose-400"> - {Math.abs(breakdown.deduction_total)}</span>
-            <span className="text-emerald-400"> + {breakdown.bonus_total}</span>
-            <span className="text-offwhite"> = {score}</span>
+          <p className="text-xs text-ice/50">Issues Found</p>
+          <p className="text-2xl font-bold text-offwhite mt-1">
+            {breakdown.deductions.length}
+            <span className="text-xs text-ice/50 font-normal ml-1">problems</span>
           </p>
         </div>
       </div>

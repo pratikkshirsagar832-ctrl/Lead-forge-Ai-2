@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { AuthGuard } from '@/components/auth/AuthGuard';
+import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { Menu } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -14,9 +15,10 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <div className="flex min-h-screen bg-navy font-sans text-ice">
+      <AnimatedBackground />
+      <div className="flex min-h-screen font-sans text-ice relative z-10">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 lg:ml-64 p-4 md:p-8 overflow-y-auto bg-navy text-ice">
+        <main className="flex-1 lg:ml-64 p-4 md:p-8 overflow-y-auto text-ice">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden mb-4 p-2 rounded-lg hover:bg-ocean/50 text-ice/60 hover:text-offwhite transition-colors"
