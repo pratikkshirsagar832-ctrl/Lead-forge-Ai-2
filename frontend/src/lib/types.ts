@@ -26,6 +26,7 @@ export interface Plan {
 export interface SearchStatus {
   id: string;
   status: string;
+  stage: number;
   progress_percent: number;
   message: string;
   total_results: number;
