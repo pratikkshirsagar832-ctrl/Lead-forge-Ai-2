@@ -210,7 +210,6 @@ async def verify_payment(
         "plan_id": plan_id,
         "status": "active",
         "razorpay_order_id": razorpay_order_id,
-        "razorpay_payment_id": razorpay_payment_id,
         "current_period_start": now.isoformat(),
         "current_period_end": period_end.isoformat(),
     }
