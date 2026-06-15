@@ -73,7 +73,7 @@ export default function BillingPage() {
 
   const handleUpgrade = async (plan: Plan) => {
     if (plan.price_monthly <= 0) return;
-    const Razorpay = (window as Record<string, unknown>).Razorpay as { new(options: Record<string, unknown>): { on: (event: string, handler: (response: unknown) => void) => void; open: () => void } } | undefined;
+    const Razorpay = (window as any).Razorpay as { new(options: Record<string, unknown>): { on: (event: string, handler: (response: unknown) => void) => void; open: () => void } } | undefined;
     if (!Razorpay) {
       setError('Payment gateway not loaded. Please refresh the page.');
       return;
