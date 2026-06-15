@@ -130,7 +130,7 @@ async def create_order(
             raise HTTPException(status_code=404, detail="Plan not found")
 
         plan = plan_resp.data[0]
-        amount = plan["price_monthly"]
+        amount = int(plan["price_monthly"])
 
         if amount <= 0:
             raise HTTPException(status_code=400, detail="Cannot create order for free plan")
@@ -175,8 +175,8 @@ async def create_order(
     except ImportError:
         raise HTTPException(status_code=500, detail="Razorpay SDK not installed")
     except Exception as e:
-        logger.error(f"Failed to create order: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create payment order")
+        logger.error(f"Failed to create order: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Payment error: {e}")
 
 
 @router.post("/verify")
