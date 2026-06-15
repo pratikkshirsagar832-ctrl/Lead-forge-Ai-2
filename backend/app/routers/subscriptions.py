@@ -123,6 +123,10 @@ async def create_order(
 
     try:
         client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
+        client._update_user_agent_header = lambda opts: {
+            **opts,
+            'headers': {**opts.get('headers', {}), 'User-Agent': 'Razorpay-Python/2.0.1'},
+        }
 
         supabase = get_supabase_admin()
         plan_resp = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
