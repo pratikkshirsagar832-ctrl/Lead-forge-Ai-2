@@ -4,7 +4,7 @@ import { Rocket, Target, Users, TrendingUp, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Overview | Hyperclients',
+  title: 'Dashboard | Hyperclients',
 };
 
 export default function DashboardOverview() {
@@ -12,9 +12,9 @@ export default function DashboardOverview() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="animate-fade-in-down">
         <h1 className="text-3xl font-bold text-offwhite tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
-          Overview
+          Dashboard
         </h1>
-        <p className="text-ice/60 mt-2">Welcome to Hyperclients. Here&apos;s what&apos;s happening today.</p>
+        <p className="text-ice/60 mt-2">Welcome to Hyperclients.</p>
       </div>
 
       <StatsCards />
@@ -29,7 +29,7 @@ export default function DashboardOverview() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-amber">Quick Action</span>
               </div>
               <h2 className="text-2xl font-bold text-offwhite mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
-                Ready to find more leads?
+                Ready to find more clients?
               </h2>
               <p className="text-ice/70 mb-8 max-w-md leading-relaxed">
                 Start a new search to scrape Google Maps, analyze websites, and identify your hottest prospects in minutes.

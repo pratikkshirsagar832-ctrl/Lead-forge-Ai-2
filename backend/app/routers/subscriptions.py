@@ -71,8 +71,8 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
                 .execute()
 
             used = usage_resp.data[0] if usage_resp.data else {}
-            searches_per_day = plan.get("searches_per_day", 1)
-            leads_per_day = plan.get("leads_per_day", 10)
+            searches_per_day = plan.get("searches_per_day", 3)
+            leads_per_day = plan.get("leads_per_day", 30)
 
             return {
                 "plan_id": plan_id,
@@ -91,11 +91,11 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
         return {
             "plan_id": "free",
             "plan_name": "Free",
-            "leads_per_day": 10,
-            "searches_per_day": 1,
+            "leads_per_day": 30,
+            "searches_per_day": 3,
             "status": "trial",
-            "remaining_searches": 1,
-            "remaining_leads": 10,
+            "remaining_searches": 3,
+            "remaining_leads": 30,
             "is_trial_expired": False,
         }
     except Exception as e:
