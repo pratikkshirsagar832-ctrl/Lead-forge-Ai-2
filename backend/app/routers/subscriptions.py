@@ -220,6 +220,16 @@ async def verify_payment(
         sub_data["user_id"] = current_user["id"]
         supabase.table("user_subscriptions").insert(sub_data).execute()
 
+    # Reset daily usage so the user gets their new plan's full limits
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    supabase.table("daily_usage").delete().eq("user_id", current_user["id"]).eq("date", today_str).execute()
+    supabase.table("daily_usage").insert({
+        "user_id": current_user["id"],
+        "date": today_str,
+        "searches_run": 0,
+        "leads_generated": 0,
+    }).execute()
+
     return {
         "status": "success",
         "plan_id": plan_id,
