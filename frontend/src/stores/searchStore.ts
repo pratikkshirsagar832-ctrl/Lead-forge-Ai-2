@@ -18,12 +18,12 @@ export interface SearchResult {
 
 export interface SearchState {
   activeSearchId: string | null;
-  progress: SearchStatus | null;
+  progress: Partial<SearchStatus> | null;
   results: SearchResult[];
   resultsTotal: number;
   history: SearchHistoryItem[];
   setActiveSearch: (id: string | null) => void;
-  setProgress: (progress: SearchStatus | null) => void;
+  setProgress: (progress: Partial<SearchStatus> | null) => void;
   setResults: (results: SearchResult[], total: number) => void;
   appendResults: (results: SearchResult[]) => void;
   setHistory: (history: SearchHistoryItem[]) => void;
