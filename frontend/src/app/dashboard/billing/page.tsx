@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, type ElementType } from 'react';
+import { Suspense, useEffect, useState, useRef, type ElementType } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import api from '@/lib/api';
@@ -20,7 +20,7 @@ const PLAN_META: Record<string, { name: string; icon: ElementType; color: string
   agency: { name: 'Agency', icon: Building2, color: 'text-amber-400', bg: 'bg-amber-500/10' },
 };
 
-export default function BillingPage() {
+function BillingContent() {
   const searchParams = useSearchParams();
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -278,5 +278,13 @@ export default function BillingPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 text-steel animate-spin" /></div>}>
+      <BillingContent />
+    </Suspense>
   );
 }

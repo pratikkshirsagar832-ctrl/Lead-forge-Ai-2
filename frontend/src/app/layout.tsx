@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <body className={`${inter.className} ${spaceGrotesk.variable} min-h-screen bg-navy text-ice antialiased`}>
+      <body className={`${inter.className} ${spaceGrotesk.variable} min-h-screen bg-navy text-ice antialiased selection:bg-violet/30 selection:text-offwhite`}>
           <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
         <ThemeProvider
           attribute="class"

@@ -63,7 +63,7 @@ class LeadDetail(BaseModel):
     ai_confidence_score: Optional[float] = None
     estimated_deal_value: Optional[float] = None
     user_status: str = "new"
-    user_notes: str = ""
+    user_notes: Optional[str] = ""
     is_favorite: bool = False
     created_at: Optional[datetime] = None
     website_analyses: list[WebsiteAnalysis] = []

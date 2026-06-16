@@ -2,7 +2,7 @@ import { HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'outline';
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'outline' | 'premium';
   dot?: boolean;
 }
 
@@ -14,12 +14,13 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variants = {
-    default: 'bg-steel/15 text-ice',
+    default: 'bg-steel/15 text-ice border border-steel/10',
     success: 'bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20',
     warning: 'bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20',
     error: 'bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20',
     info: 'bg-steel/20 text-ice ring-1 ring-inset ring-steel/30',
     outline: 'bg-transparent text-ice/60 border border-steel/30',
+    premium: 'bg-gradient-to-r from-violet/20 to-steel/20 text-offwhite border border-violet/30 shadow-sm',
   };
 
   const dotColors = {
@@ -29,6 +30,7 @@ export function Badge({
     error: 'bg-red-400',
     info: 'bg-steel',
     outline: 'bg-ice/40',
+    premium: 'bg-violet-400',
   };
 
   return (

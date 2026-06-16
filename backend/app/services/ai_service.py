@@ -137,7 +137,7 @@ def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
 
 def _calculate_confidence(lead: dict, analysis: Optional[dict] = None) -> float:
     score = 0.5
-    if not lead.get("website_url"):
+    if lead.get("website_url"):
         score += 0.2
     if analysis:
         issue_count = len(analysis.get("issues", []))

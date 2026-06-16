@@ -3,13 +3,12 @@
 import { useState, useEffect } from 'react';
 
 import { useSearchStore } from '@/stores/searchStore';
-import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { formatDuration } from '@/lib/utils';
 import { SEARCH_STATUSES } from '@/lib/constants';
 import { motion } from 'framer-motion';
-import { Loader2, CheckCircle, XCircle, Clock, Search, MapPin } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Clock, Search, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 interface SearchProgressCardProps {
@@ -20,16 +19,16 @@ interface SearchProgressCardProps {
 export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCardProps) {
   const { progress } = useSearchStore();
 
-  if (!progress) return null;
+  const [localElapsed, setLocalElapsed] = useState(0);
 
-  const statusConfig = SEARCH_STATUSES[(progress.status ?? 'queued') as keyof typeof SEARCH_STATUSES] || SEARCH_STATUSES.queued;
-  const isFinished = ['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
-
-  const percentage = isFinished ? 100 : Math.max(5, progress.progress_percent || 0);
-
-  const [localElapsed, setLocalElapsed] = useState(progress.elapsed_seconds || 0);
+  const isFinished = progress ? ['completed', 'failed', 'cancelled'].includes(progress.status ?? '') : false;
+  const statusConfig = progress
+    ? SEARCH_STATUSES[(progress.status ?? 'queued') as keyof typeof SEARCH_STATUSES] || SEARCH_STATUSES.queued
+    : SEARCH_STATUSES.queued;
+  const percentage = progress ? (isFinished ? 100 : Math.max(5, progress.progress_percent || 0)) : 0;
 
   useEffect(() => {
+    if (!progress) return;
     if (isFinished) {
       setLocalElapsed(progress.elapsed_seconds || 0);
       return;
@@ -46,7 +45,9 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [progress.started_at, progress.elapsed_seconds, isFinished]);
+  }, [progress?.started_at, progress?.elapsed_seconds, isFinished, progress]);
+
+  if (!progress) return null;
 
   return (
     <motion.div
@@ -54,24 +55,26 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className="max-w-3xl mx-auto mt-8 relative"
     >
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-steel to-ice rounded-2xl blur opacity-20 animate-pulse" />
-      <div className="relative bg-gradient-to-br from-ocean/50 to-navy rounded-2xl p-8 border border-steel/30 shadow-2xl overflow-hidden">
+      {/* Premium glow border */}
+      <div className="absolute -inset-[1px] bg-gradient-to-r from-steel/30 via-violet/20 to-teal/20 rounded-2xl blur opacity-30 animate-pulse-slow" />
+      <div className="relative bg-gradient-to-br from-sapphire/50 to-navy/90 rounded-2xl p-8 border border-steel/25 shadow-2xl shadow-black/40 overflow-hidden">
 
+        {/* Ambient glow */}
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-steel/10 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-ocean/20 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-violet/10 blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1.5">
-                <h3 className="text-xl font-bold text-offwhite tracking-tight">
+                <h3 className="text-xl font-bold text-offwhite tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
                   Search Progress
                 </h3>
                 <Badge variant={
                   progress.status === 'completed' ? 'success' :
                   progress.status === 'failed' ? 'error' :
                   progress.status === 'cancelled' ? 'outline' : 'info'
-                } dot className="scale-90 origin-left">
+                } dot>
                   {statusConfig.label}
                 </Badge>
               </div>
@@ -84,19 +87,20 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
             </div>
           </div>
 
-          <div className="relative h-2 bg-navy/50 rounded-full overflow-hidden mb-8 shadow-inner border border-ocean/30">
+          {/* Premium progress bar */}
+          <div className="relative h-2.5 bg-navy/60 rounded-full overflow-hidden mb-8 shadow-inner border border-steel/15">
             <motion.div
               className={`absolute top-0 left-0 h-full rounded-full ${
-                progress.status === 'failed' ? 'bg-rose-500' :
-                progress.status === 'cancelled' ? 'bg-ice/30' :
-                'bg-gradient-to-r from-steel to-ice'
+                progress.status === 'failed' ? 'bg-gradient-to-r from-rose-500 to-rose-400' :
+                progress.status === 'cancelled' ? 'bg-gradient-to-r from-ice/30 to-ice/20' :
+                'bg-gradient-to-r from-steel via-violet to-teal'
               }`}
               initial={{ width: 0 }}
               animate={{ width: `${percentage}%` }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
             >
               {!isFinished && (
-                <div className="absolute top-0 right-0 bottom-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
               )}
             </motion.div>
           </div>
@@ -105,7 +109,7 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
             <div className="bg-steel/[0.03] rounded-xl p-5 border border-steel/10 hover:bg-steel/[0.05] transition-colors relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-steel/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2 opacity-80">
+                <div className="flex items-center gap-2 mb-2">
                   <Search className="w-4 h-4 text-steel" />
                   <p className="text-xs font-semibold text-ice/60 uppercase tracking-wider">Total Found</p>
                 </div>
@@ -116,7 +120,7 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
             <div className="bg-steel/[0.03] rounded-xl p-5 border border-steel/10 hover:bg-steel/[0.05] transition-colors relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2 opacity-80">
+                <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="w-4 h-4 text-emerald-400" />
                   <p className="text-xs font-semibold text-ice/60 uppercase tracking-wider">Processed</p>
                 </div>
@@ -143,12 +147,13 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t border-ocean/30 relative z-10">
+          <div className="flex justify-end gap-3 pt-6 border-t border-steel/15 relative z-10">
             {!isFinished ? (
               <>
                 {localElapsed > 120 && (
                   <p className="mr-auto text-sm text-amber-400 flex items-center font-medium">
-                    Search operation is processing extensive data...
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                    Processing extensive data...
                   </p>
                 )}
                 <LoadingButton
@@ -165,9 +170,12 @@ export function SearchProgressCard({ onCancel, isCancelling }: SearchProgressCar
                 {progress.status === 'completed' && (progress.total_results || 0) > 0 && (
                   <Link
                     href="/dashboard/leads"
-                    className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-offwhite bg-gradient-to-r from-steel to-ocean hover:from-steel/90 hover:to-ocean/90 transition-all shadow-[0_0_20px_rgba(74,127,167,0.4)] hover:shadow-[0_0_30px_rgba(74,127,167,0.6)]"
+                    className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-offwhite bg-gradient-to-r from-steel to-violet hover:from-steel/90 hover:to-violet/90 transition-all shadow-lg shadow-steel/20 hover:shadow-xl hover:shadow-violet/30 group"
                   >
-                    View Leads Dashboard
+                    <span>View Leads Dashboard</span>
+                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path d="M5 12h14m-6-6 6 6-6 6" />
+                    </svg>
                   </Link>
                 )}
               </>

@@ -12,21 +12,34 @@ import { Search, MapPin, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
+function safeFormatDistance(date: string | undefined): string {
+  if (!date) return 'Unknown date';
+  try {
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
+  } catch {
+    return 'Unknown date';
+  }
+}
+
 export default function HistoryPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  const fetchHistory = async () => {
+    try {
+      setHasError(false);
+      const { data } = await api.get(API_ROUTES.searches.list);
+      setHistory(data.items || []);
+    } catch (error) {
+      console.error('Failed to fetch history', error);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const { data } = await api.get(API_ROUTES.searches.list);
-        setHistory(data.items || []);
-      } catch (error) {
-        console.error('Failed to fetch history', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchHistory();
   }, []);
 
@@ -41,6 +54,11 @@ export default function HistoryPage() {
         <div className="space-y-4">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}
         </div>
+      ) : hasError ? (
+        <GlassCard className="p-8 text-center">
+          <p className="text-rose-400 mb-4">Failed to load search history. Please try again.</p>
+          <button onClick={fetchHistory} className="text-steel hover:text-ice underline text-sm">Retry</button>
+        </GlassCard>
       ) : history.length === 0 ? (
         <EmptyState
           title="No history yet"
@@ -82,7 +100,7 @@ export default function HistoryPage() {
                       <div className="flex items-center gap-4 text-sm text-ice/60">
                         <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {item.location}</span>
                         <span>•</span>
-                        <span>{formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}</span>
+                        <span>{safeFormatDistance(item.created_at)}</span>
                       </div>
                     </div>
                   </div>

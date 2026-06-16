@@ -8,9 +8,10 @@ import { motion } from 'framer-motion';
 interface LoadingButtonProps extends Omit<React.ComponentPropsWithoutRef<typeof motion.button>, 'onDrag' | 'onDragStart' | 'onDragEnd' | 'children'> {
   children?: React.ReactNode;
   isLoading?: boolean;
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'gradient' | 'gold';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'gradient' | 'gold' | 'premium';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
+  icon?: React.ReactNode;
 }
 
 export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
@@ -21,6 +22,7 @@ export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
       variant = 'primary',
       size = 'md',
       fullWidth = false,
+      icon,
       className,
       disabled,
       ...props
@@ -44,6 +46,8 @@ export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
         'bg-gradient-to-r from-steel to-ocean text-offwhite hover:from-steel/90 hover:to-ocean/90 focus:ring-steel/50 shadow-lg shadow-steel/25 hover:shadow-xl hover:shadow-steel/35 active:scale-[0.97]',
       gold:
         'bg-gradient-to-r from-amber to-amber-dark text-navy font-bold hover:from-amber-dark hover:to-amber focus:ring-amber/50 shadow-lg shadow-amber/30 hover:shadow-xl hover:shadow-amber/40 active:scale-[0.97]',
+      premium:
+        'bg-gradient-to-r from-violet to-steel text-offwhite hover:from-violet/90 hover:to-steel/90 focus:ring-violet/50 shadow-lg shadow-violet/25 hover:shadow-xl hover:shadow-violet/35 active:scale-[0.97]',
     };
 
     const sizes = {
@@ -68,6 +72,7 @@ export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
         {...props}
       >
         <span className={cn('flex items-center justify-center gap-2', isLoading && 'opacity-0')}>
+          {icon && <span className="w-4 h-4">{icon}</span>}
           {children}
         </span>
 
@@ -75,6 +80,7 @@ export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className="absolute inset-0 flex items-center justify-center bg-inherit"
           >
             <Loader2 className={cn('w-5 h-5 animate-spin', variant === 'gold' ? 'text-navy' : 'text-current')} />

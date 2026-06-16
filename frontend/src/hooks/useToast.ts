@@ -18,7 +18,7 @@ interface ToastState {
 export const useToast = create<ToastState>((set) => ({
   toasts: [],
   showToast: (message, type = 'info', duration = 3000) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = crypto.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
     set((state) => ({
       toasts: [...state.toasts, { id, type, message, duration }],
     }));

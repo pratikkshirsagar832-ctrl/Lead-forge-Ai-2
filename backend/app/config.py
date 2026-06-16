@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
 
-    gmaps_scraper_path: str = "backend/google-maps-scraper/google-maps-scraper.exe"
+    gmaps_scraper_path: str = "backend/google-maps-scraper/google-maps-scraper"
 
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"

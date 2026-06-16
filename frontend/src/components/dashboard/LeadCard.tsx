@@ -5,8 +5,10 @@ import { formatNumber, truncate } from '@/lib/utils';
 import { MapPin, Globe, Star, Phone, ChevronRight, Heart } from 'lucide-react';
 import Link from 'next/link';
 
+import type { LeadListItem } from '@/lib/types';
+
 interface LeadCardProps {
-  lead: any;
+  lead: LeadListItem;
   onToggleFavorite: (id: string, current: boolean) => void;
   isUpdatingFav: boolean;
 }
@@ -81,7 +83,7 @@ export function LeadCard({ lead, onToggleFavorite, isUpdatingFav }: LeadCardProp
               <div className="p-1.5 shrink-0 rounded-lg bg-ocean/25 text-steel/70 group-hover/item:text-ice transition-colors">
                 <Phone className="w-3.5 h-3.5" />
               </div>
-              <a href={`tel:${lead.phone}`} className="font-medium tracking-wide text-[13px] hover:text-ice transition-colors">{lead.phone}</a>
+              <span onClick={(e) => { e.stopPropagation(); window.open(`tel:${lead.phone}`); }} className="cursor-pointer font-medium tracking-wide text-[13px] hover:text-ice transition-colors">{lead.phone}</span>
             </div>
           )}
 
@@ -90,9 +92,9 @@ export function LeadCard({ lead, onToggleFavorite, isUpdatingFav }: LeadCardProp
               <Globe className="w-3.5 h-3.5" />
             </div>
             {lead.website_url ? (
-              <a href={lead.website_url} target="_blank" rel="noreferrer" className="text-steel hover:text-ice hover:underline truncate font-medium text-[13px]" onClick={(e) => e.stopPropagation()}>
+              <span onClick={(e) => { e.stopPropagation(); window.open(lead.website_url, '_blank', 'noreferrer'); }} className="cursor-pointer text-steel hover:text-ice hover:underline truncate font-medium text-[13px]">
                 {truncate(lead.website_url.replace(/^https?:\/\/(www\.)?/, ''), 22)}
-              </a>
+              </span>
             ) : (
               <span className="text-ice/30 italic text-[13px]">No website</span>
             )}

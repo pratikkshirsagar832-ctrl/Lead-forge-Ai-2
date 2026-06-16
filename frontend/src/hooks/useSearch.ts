@@ -39,12 +39,18 @@ export function useSearch() {
       if (data.total > resultsPageRef.current * 4) {
         resultsPageRef.current += 1;
       }
+      retryCountRef.current = 0;
       resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
     } catch (e) {
       console.warn('Poll results failed, retrying:', e);
+      retryCountRef.current += 1;
+      if (retryCountRef.current > 50) {
+        clearPolling();
+        return;
+      }
       resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
     }
-  }, [appendResults]);
+  }, [appendResults, clearPolling]);
 
   const pollStatus = useCallback(async (id: string) => {
     try {

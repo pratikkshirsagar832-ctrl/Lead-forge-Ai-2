@@ -95,8 +95,8 @@ function organizeSections(raw: Record<string, any>): SectionDef[] {
       { label: 'Contact Info Found', pass: (raw.emails_count || 0) > 0 || (raw.phones_count || 0) > 0 },
       { label: 'Email Found', pass: (raw.emails_count || 0) > 0 },
       { label: 'Phone Found', pass: (raw.phones_count || 0) > 0 },
-      { label: 'Clickable Phone (tel:)', pass: !((raw.phones_count || 0) > 0) || !!raw.phones_count },
-      { label: 'Clickable Email (mailto:)', pass: !((raw.emails_count || 0) > 0) || true },
+      { label: 'Clickable Phone (tel:)', pass: !!(raw.has_tel_link || raw.phones_found?.some((p: string) => p.startsWith('tel:'))) },
+      { label: 'Clickable Email (mailto:)', pass: !!(raw.has_mailto || raw.emails_found?.some((e: string) => e.startsWith('mailto:'))) },
       { label: 'Social Media Presence', pass: (raw.social_count || 0) > 0, detail: raw.social_platforms?.join(', ') || 'None' },
     ],
   });

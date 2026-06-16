@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       if (mode === 'signup') {
@@ -38,7 +40,7 @@ export default function LoginPage() {
           options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
         });
         if (signUpError) throw signUpError;
-        setError('Check your email for the confirmation link!');
+        setSuccessMessage('Check your email for the confirmation link!');
         setIsLoading(false);
         return;
       }
@@ -92,13 +94,13 @@ export default function LoginPage() {
 
         <div className="flex mb-6 bg-ocean/20 rounded-lg p-1">
           <button
-            onClick={() => { setMode('login'); setError(''); }}
+            onClick={() => { setMode('login'); setError(''); setSuccessMessage(''); }}
             className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${mode === 'login' ? 'bg-steel text-offwhite shadow-lg' : 'text-ice/60 hover:text-offwhite'}`}
           >
             Sign In
           </button>
           <button
-            onClick={() => { setMode('signup'); setError(''); }}
+            onClick={() => { setMode('signup'); setError(''); setSuccessMessage(''); }}
             className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${mode === 'signup' ? 'bg-steel text-offwhite shadow-lg' : 'text-ice/60 hover:text-offwhite'}`}
           >
             Sign Up
@@ -144,9 +146,14 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {successMessage && (
+            <p className="text-sm text-center text-emerald-400">
+              {successMessage}
+            </p>
+          )}
           {error && (
-            <p className={`text-sm text-center ${String(error).includes('Check your email') ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {String(error)}
+            <p className="text-sm text-center text-rose-400">
+              {error}
             </p>
           )}
 

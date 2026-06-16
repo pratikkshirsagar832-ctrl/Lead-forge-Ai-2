@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.user_subscriptions (
     trial_end TIMESTAMPTZ,
     razorpay_subscription_id TEXT,
     razorpay_order_id TEXT,
+    razorpay_payment_id TEXT,
     cancelled_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -44,6 +45,9 @@ CREATE TABLE IF NOT EXISTS public.user_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON public.user_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan_id ON public.user_subscriptions(plan_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON public.user_subscriptions(status);
+
+-- Add payment_id column if table already existed without it
+ALTER TABLE public.user_subscriptions ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
 
 -- ═══════════════════════════════════════════════════════════════
 -- 3. DAILY USAGE TRACKING

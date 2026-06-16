@@ -45,7 +45,6 @@ export default function LeadDetailPage() {
       } catch (error) {
         if (cancelled) return;
         showToast('Failed to load lead details', 'error');
-        router.push('/dashboard/leads');
       } finally {
         if (!cancelled) setIsPageLoading(false);
       }
@@ -145,7 +144,22 @@ export default function LeadDetailPage() {
     );
   }
 
-  if (!lead) return null;
+  if (!lead) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 pb-12">
+        <button
+          onClick={() => router.push('/dashboard/leads')}
+          className="flex items-center gap-2 text-sm font-medium text-ice/60 hover:text-offwhite transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Leads
+        </button>
+        <GlassCard className="p-8 text-center">
+          <p className="text-ice/60 mb-4">Failed to load lead. It may have been removed.</p>
+          <button onClick={() => window.location.reload()} className="text-steel hover:text-ice underline text-sm">Retry</button>
+        </GlassCard>
+      </div>
+    );
+  }
 
   const leadCatKey = lead.lead_category || 'warm';
   const categoryConfig = LEAD_CATEGORIES[leadCatKey as keyof typeof LEAD_CATEGORIES]

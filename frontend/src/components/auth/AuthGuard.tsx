@@ -46,13 +46,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               return;
             }
           } catch {}
-          if (mountedRef.current) router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+          if (mountedRef.current) {
+            router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+          }
         }, 3000);
       } catch (err) {
         console.error('AuthGuard: session check failed', err);
         safeRedirect('/login');
-      } finally {
-        if (mountedRef.current) setIsLoading(false);
       }
     };
 

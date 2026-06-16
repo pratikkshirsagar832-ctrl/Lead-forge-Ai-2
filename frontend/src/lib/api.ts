@@ -24,7 +24,8 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && isBrowser) {
+    if (error.response?.status === 401 && isBrowser && !error.config._retry) {
+      error.config._retry = true;
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const { data, error: refreshError } = await supabase.auth.refreshSession();

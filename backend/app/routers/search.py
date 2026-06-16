@@ -62,7 +62,24 @@ async def create_search(
             "p_leads": 0,
         }).execute()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to record usage: {str(e)}")
+        logger.warning(f"Failed to increment daily usage via RPC: {e}")
+        # Fallback: upsert directly
+        try:
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            existing = supabase.table("daily_usage").select("id, searches_run").eq("user_id", user_id).eq("date", today_str).execute()
+            if existing.data and len(existing.data) > 0:
+                supabase.table("daily_usage").update({
+                    "searches_run": (existing.data[0].get("searches_run", 0) or 0) + 1,
+                }).eq("id", existing.data[0]["id"]).execute()
+            else:
+                supabase.table("daily_usage").insert({
+                    "user_id": user_id,
+                    "date": today_str,
+                    "searches_run": 1,
+                    "leads_generated": 0,
+                }).execute()
+        except Exception as fallback_err:
+            raise HTTPException(status_code=500, detail=f"Failed to record usage: {str(fallback_err)}")
 
     try:
         response = supabase.table("searches").insert(search_data).execute()
@@ -72,7 +89,8 @@ async def create_search(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create search: {str(e)}")
+        logger.error(f"Failed to create search: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create search")
 
     background_tasks.add_task(
         run_search_pipeline,
@@ -89,10 +107,13 @@ async def create_search(
 async def scraper_health_check(current_user: dict = Depends(get_current_user)):
     """Check if scraper binary exists and is executable."""
     from app.config import get_settings
+    settings = get_settings()
+    if settings.is_production:
+        raise HTTPException(status_code=404, detail="Not found")
+
     from app.services.scraper_service import _get_scraper_path
     import os
 
-    settings = get_settings()
     scraper_path = _get_scraper_path()
 
     result = {

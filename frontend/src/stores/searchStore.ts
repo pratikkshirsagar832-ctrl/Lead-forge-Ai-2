@@ -43,7 +43,10 @@ export const useSearchStore = create<SearchState>((set) => ({
     set((state) => {
       const existingIds = new Set(state.results.map((r) => r.id));
       const unique = newResults.filter((r) => !existingIds.has(r.id));
-      return { results: [...state.results, ...unique] };
+      return {
+        results: [...state.results, ...unique],
+        resultsTotal: state.resultsTotal + unique.length,
+      };
     }),
   setHistory: (history) => set({ history }),
   clearActiveSearch: () =>

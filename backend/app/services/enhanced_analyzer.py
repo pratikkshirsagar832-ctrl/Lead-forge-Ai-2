@@ -246,6 +246,7 @@ async def analyze_website(url: str) -> dict[str, Any]:
             score += add_deduction("No canonical tag", 3, "minor")
 
         raw["schema_count"] = len(schema_data)
+        raw["has_structured_data"] = len(schema_data) > 0
         raw["schema_types"] = sorted(set(
             s.get("@type", "") for s in schema_data
         ))

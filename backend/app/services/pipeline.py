@@ -15,7 +15,7 @@ Phase 2 batches non-trivial results (score >= 20) to Gemini for deep analysis.
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.database import get_supabase_admin
 from app.services.scraper_service import run_maps_scraper
@@ -124,11 +124,26 @@ async def _save_leads(
     supabase, search_id: str, user_id: str, raw_results: list[dict]
 ) -> list[str]:
     # Check remaining leads limit before saving
+    remaining_leads = 30  # default fallback
     try:
-        rem_resp = supabase.rpc("get_remaining_leads", {"p_user_id": user_id}).execute()
-        remaining_leads = rem_resp.data if rem_resp and rem_resp.data is not None else 0
+        rem_resp = await asyncio.to_thread(
+            lambda: supabase.rpc("get_remaining_leads", {"p_user_id": user_id}).execute()
+        )
+        if rem_resp and rem_resp.data is not None:
+            remaining_leads = rem_resp.data
     except Exception:
-        remaining_leads = 0
+        # Try direct query as fallback
+        try:
+            sub_resp = supabase.table("user_subscriptions").select("plan_id").eq("user_id", user_id).order("created_at", desc=True).limit(1).execute()
+            if sub_resp.data and len(sub_resp.data) > 0:
+                plan_resp = supabase.table("plans").select("leads_per_day").eq("id", sub_resp.data[0].get("plan_id", "free")).execute()
+                if plan_resp.data and len(plan_resp.data) > 0:
+                    remaining_leads = plan_resp.data[0].get("leads_per_day", 30)
+            usage_resp = supabase.table("daily_usage").select("leads_generated").eq("user_id", user_id).eq("date", date.today().isoformat()).execute()
+            if usage_resp.data and len(usage_resp.data) > 0:
+                remaining_leads = max(0, remaining_leads - (usage_resp.data[0].get("leads_generated", 0) or 0))
+        except Exception:
+            pass
 
     lead_ids = []
     for result in raw_results:
@@ -155,7 +170,9 @@ async def _save_leads(
                 "description": result.get("description", ""),
                 "lead_category": "warm" if has_website else "hot",
             }
-            response = supabase.table("leads").insert(lead_data).execute()
+            response = await asyncio.to_thread(
+                lambda: supabase.table("leads").insert(lead_data).execute()
+            )
             if response.data:
                 lead_ids.append(response.data[0]["id"])
                 remaining_leads -= 1  # decrement local counter after successful save
@@ -168,8 +185,8 @@ async def _save_leads(
 
 async def _finalize_search(supabase, search_id: str) -> None:
     try:
-        all_leads = (
-            supabase.table("leads")
+        all_leads = await asyncio.to_thread(
+            lambda: supabase.table("leads")
             .select("lead_category")
             .eq("search_id", search_id)
             .execute()
@@ -213,6 +230,8 @@ async def _mark_cancelled(supabase, search_id: str) -> None:
 
 async def _update_search(supabase, search_id: str, data: dict) -> None:
     try:
-        supabase.table("searches").update(data).eq("id", search_id).execute()
+        await asyncio.to_thread(
+            lambda: supabase.table("searches").update(data).eq("id", search_id).execute()
+        )
     except Exception as e:
         logger.error(f"[Pipeline:{search_id}] Failed to update search: {e}")

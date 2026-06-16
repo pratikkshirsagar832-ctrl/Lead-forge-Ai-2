@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/subscriptions", tags=["Subscriptions"])
 
 
+def _get_razorpay_client(settings):
+    client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
+    client._update_user_agent_header = lambda opts: {
+        **opts,
+        'headers': {**opts.get('headers', {}), 'User-Agent': 'Razorpay-Python/2.0.1'},
+    }
+    return client
+
+
 @router.get("/plans")
 async def list_plans():
     supabase = get_supabase_admin()
@@ -122,12 +131,7 @@ async def create_order(
         raise HTTPException(status_code=500, detail="Razorpay SDK not installed")
 
     try:
-        client = razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
-        client._update_user_agent_header = lambda opts: {
-            **opts,
-            'headers': {**opts.get('headers', {}), 'User-Agent': 'Razorpay-Python/2.0.1'},
-        }
-
+        client = _get_razorpay_client(settings)
         supabase = get_supabase_admin()
         plan_resp = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
         if not plan_resp.data or len(plan_resp.data) == 0:
@@ -156,7 +160,7 @@ async def create_order(
         if existing_sub.data and len(existing_sub.data) > 0:
             supabase.table("user_subscriptions").update({
                 "razorpay_order_id": order["id"],
-            }).eq("user_id", current_user["id"]).execute()
+            }).eq("user_id", current_user["id"]).order("created_at", desc=True).limit(1).execute()
         else:
             supabase.table("user_subscriptions").insert({
                 "user_id": current_user["id"],
@@ -180,7 +184,7 @@ async def create_order(
         raise HTTPException(status_code=500, detail="Razorpay SDK not installed")
     except Exception as e:
         logger.error(f"Failed to create order: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Payment error: {e}")
+        raise HTTPException(status_code=500, detail="Payment processing failed")
 
 
 @router.post("/verify")
@@ -229,20 +233,28 @@ async def verify_payment(
     }
 
     if existing.data and len(existing.data) > 0:
-        supabase.table("user_subscriptions").update(sub_data).eq("user_id", current_user["id"]).execute()
+        sub_data["razorpay_payment_id"] = razorpay_payment_id
+        supabase.table("user_subscriptions").update(sub_data).eq("user_id", current_user["id"]).order("created_at", desc=True).limit(1).execute()
     else:
         sub_data["user_id"] = current_user["id"]
+        sub_data["razorpay_payment_id"] = razorpay_payment_id
         supabase.table("user_subscriptions").insert(sub_data).execute()
 
-    # Reset daily usage so the user gets their new plan's full limits
+    # Reset daily usage so the user gets their new plan's full limits (idempotent: delete + re-insert)
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    supabase.table("daily_usage").delete().eq("user_id", current_user["id"]).eq("date", today_str).execute()
-    supabase.table("daily_usage").insert({
-        "user_id": current_user["id"],
-        "date": today_str,
-        "searches_run": 0,
-        "leads_generated": 0,
-    }).execute()
+    existing_usage = supabase.table("daily_usage").select("searches_run").eq("user_id", current_user["id"]).eq("date", today_str).execute()
+    if existing_usage.data and len(existing_usage.data) > 0:
+        supabase.table("daily_usage").update({
+            "searches_run": 0,
+            "leads_generated": 0,
+        }).eq("user_id", current_user["id"]).eq("date", today_str).execute()
+    else:
+        supabase.table("daily_usage").insert({
+            "user_id": current_user["id"],
+            "date": today_str,
+            "searches_run": 0,
+            "leads_generated": 0,
+        }).execute()
 
     return {
         "status": "success",
@@ -285,24 +297,38 @@ async def razorpay_webhook(request: Request):
             payment_id = payload.get("payment", {}).get("entity", {}).get("id", "")
             if order_id and payment_id:
                 # Idempotency check: skip if payment already processed
-                existing = supabase.table("user_subscriptions").select("id").eq("razorpay_order_id", order_id).limit(1).execute()
+                existing = supabase.table("user_subscriptions").select("id, user_id").eq("razorpay_order_id", order_id).limit(1).execute()
                 sub_data = existing.data[0] if existing.data and len(existing.data) > 0 else None
                 if sub_data:
                     supabase.table("user_subscriptions").update({
                         "status": "active",
+                        "razorpay_payment_id": payment_id,
                     }).eq("id", sub_data["id"]).execute()
+
+                    # Reset daily usage so user gets full plan limits
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    supabase.table("daily_usage").delete().eq("user_id", sub_data["user_id"]).eq("date", today_str).execute()
 
         elif event_type == "subscription.charged":
             sub_id = payload.get("subscription", {}).get("entity", {}).get("id", "")
             if sub_id:
-                supabase.table("user_subscriptions").update({
-                    "status": "active",
-                }).eq("razorpay_subscription_id", sub_id).execute()
+                existing = supabase.table("user_subscriptions").select("id, user_id").eq("razorpay_subscription_id", sub_id).limit(1).execute()
+                if existing.data and len(existing.data) > 0:
+                    sub_row = existing.data[0]
+                    supabase.table("user_subscriptions").update({
+                        "status": "active",
+                    }).eq("id", sub_row["id"]).execute()
+
+                    # Reset daily usage
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    supabase.table("daily_usage").delete().eq("user_id", sub_row["user_id"]).eq("date", today_str).execute()
 
         return {"status": "ok"}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return {"status": "error", "message": str(e)}
+        logger.error(f"Webhook error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Webhook processing failed")
 
 
 @router.post("/cancel")
