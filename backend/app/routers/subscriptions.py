@@ -44,6 +44,19 @@ async def list_plans():
 async def get_current_subscription(current_user: dict = Depends(get_current_user)):
     supabase = get_supabase_admin()
 
+    from datetime import date
+
+    # Compute correct remaining counts from actual table state
+    today = date.today().isoformat()
+    usage_resp = supabase.table("daily_usage") \
+        .select("searches_run, leads_generated") \
+        .eq("user_id", current_user["id"]) \
+        .eq("date", today) \
+        .execute()
+    used = usage_resp.data[0] if usage_resp.data and len(usage_resp.data) > 0 else {}
+    used_searches = used.get("searches_run", 0) or 0
+    used_leads = used.get("leads_generated", 0) or 0
+
     try:
         resp = supabase.rpc(
             "get_user_subscription",
@@ -51,7 +64,12 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
         ).execute()
 
         if resp and resp.data:
-            return resp.data
+            data = resp.data
+            searches_per_day = data.get("searches_per_day", 3)
+            leads_per_day = data.get("leads_per_day", 30)
+            data["remaining_searches"] = max(0, searches_per_day - used_searches)
+            data["remaining_leads"] = max(0, leads_per_day - used_leads)
+            return data
     except Exception as e:
         logger.warning(f"RPC get_user_subscription failed: {e}")
 
@@ -158,9 +176,10 @@ async def create_order(
         existing_sub = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).limit(1).execute()
 
         if existing_sub.data and len(existing_sub.data) > 0:
+            sub_id = existing_sub.data[0]["id"]
             supabase.table("user_subscriptions").update({
                 "razorpay_order_id": order["id"],
-            }).eq("user_id", current_user["id"]).order("created_at", desc=True).limit(1).execute()
+            }).eq("id", sub_id).execute()
         else:
             supabase.table("user_subscriptions").insert({
                 "user_id": current_user["id"],
@@ -234,7 +253,8 @@ async def verify_payment(
 
     if existing.data and len(existing.data) > 0:
         sub_data["razorpay_payment_id"] = razorpay_payment_id
-        supabase.table("user_subscriptions").update(sub_data).eq("user_id", current_user["id"]).order("created_at", desc=True).limit(1).execute()
+        sub_id = existing.data[0]["id"]
+        supabase.table("user_subscriptions").update(sub_data).eq("id", sub_id).execute()
     else:
         sub_data["user_id"] = current_user["id"]
         sub_data["razorpay_payment_id"] = razorpay_payment_id

@@ -16,12 +16,28 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     supabase = get_supabase_admin()
     subscription = None
 
+    # Compute correct remaining counts from actual table state
+    today_str = date.today().isoformat()
+    usage_resp = supabase.table("daily_usage") \
+        .select("searches_run, leads_generated") \
+        .eq("user_id", current_user["id"]) \
+        .eq("date", today_str) \
+        .execute()
+    used = usage_resp.data[0] if usage_resp.data and len(usage_resp.data) > 0 else {}
+    used_searches = used.get("searches_run", 0) or 0
+    used_leads = used.get("leads_generated", 0) or 0
+
     try:
         sub_resp = supabase.rpc(
             "get_user_subscription",
             {"p_user_id": current_user["id"]},
         ).execute()
-        subscription = sub_resp.data if sub_resp and sub_resp.data else None
+        if sub_resp and sub_resp.data:
+            subscription = sub_resp.data
+            searches_per_day = subscription.get("searches_per_day", 3)
+            leads_per_day = subscription.get("leads_per_day", 30)
+            subscription["remaining_searches"] = max(0, searches_per_day - used_searches)
+            subscription["remaining_leads"] = max(0, leads_per_day - used_leads)
     except Exception as e:
         logger.warning(f"RPC get_user_subscription failed: {e}")
 

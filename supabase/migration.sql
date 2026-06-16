@@ -220,8 +220,8 @@ RETURNS INTEGER
 LANGUAGE plpgsql STABLE
 AS $$
 DECLARE
-    plan_max INTEGER;
-    used_today INTEGER;
+    plan_max INTEGER := 0;
+    used_today INTEGER := 0;
 BEGIN
     SELECT COALESCE(pl.searches_per_day, 1) INTO plan_max
     FROM user_subscriptions us
@@ -232,7 +232,7 @@ BEGIN
     FROM daily_usage du
     WHERE du.user_id = p_user_id AND du.date = CURRENT_DATE;
 
-    RETURN GREATEST(0, plan_max - used_today);
+    RETURN GREATEST(0, COALESCE(plan_max, 1) - COALESCE(used_today, 0));
 END;
 $$;
 
@@ -244,8 +244,8 @@ RETURNS INTEGER
 LANGUAGE plpgsql STABLE
 AS $$
 DECLARE
-    plan_max INTEGER;
-    used_today INTEGER;
+    plan_max INTEGER := 0;
+    used_today INTEGER := 0;
 BEGIN
     SELECT COALESCE(pl.leads_per_day, 10) INTO plan_max
     FROM user_subscriptions us
@@ -256,7 +256,7 @@ BEGIN
     FROM daily_usage du
     WHERE du.user_id = p_user_id AND du.date = CURRENT_DATE;
 
-    RETURN GREATEST(0, plan_max - used_today);
+    RETURN GREATEST(0, COALESCE(plan_max, 10) - COALESCE(used_today, 0));
 END;
 $$;
 
@@ -285,7 +285,9 @@ BEGIN
     ) INTO result
     FROM user_subscriptions us
     JOIN plans pl ON us.plan_id = pl.id
-    WHERE us.user_id = p_user_id;
+    WHERE us.user_id = p_user_id
+    ORDER BY us.created_at DESC
+    LIMIT 1;
 
     RETURN result;
 END;
