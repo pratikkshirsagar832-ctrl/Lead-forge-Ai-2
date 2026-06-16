@@ -92,8 +92,8 @@ export function LeadCard({ lead, onToggleFavorite, isUpdatingFav }: LeadCardProp
               <Globe className="w-3.5 h-3.5" />
             </div>
             {lead.website_url ? (
-              <span onClick={(e) => { e.stopPropagation(); window.open(lead.website_url, '_blank', 'noreferrer'); }} className="cursor-pointer text-steel hover:text-ice hover:underline truncate font-medium text-[13px]">
-                {truncate(lead.website_url.replace(/^https?:\/\/(www\.)?/, ''), 22)}
+              <span onClick={(e) => { e.stopPropagation(); window.open(lead.website_url!, '_blank', 'noreferrer'); }} className="cursor-pointer text-steel hover:text-ice hover:underline truncate font-medium text-[13px]">
+                {truncate(lead.website_url!.replace(/^https?:\/\/(www\.)?/, ''), 22)}
               </span>
             ) : (
               <span className="text-ice/30 italic text-[13px]">No website</span>
