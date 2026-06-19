@@ -11,7 +11,7 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
-import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, CheckCircle, TrendingUp, Hash, Zap } from 'lucide-react';
+import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, Zap, Target, Filter, ArrowRight, Cookie, Activity, Hash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { LEAD_CATEGORIES } from '@/lib/constants';
@@ -58,11 +58,11 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
         transition={{ duration: 0.4, delay: index * 0.08, ease: 'easeOut' }}
       >
         <Link href={`/dashboard/leads/${lead.id}`} className="block group">
-          <div className="relative glass-light rounded-xl border border-white/5 hover:border-accent-cyan/20 transition-all duration-300 overflow-hidden hover:shadow-lg hover:shadow-accent-cyan/5 hover:-translate-y-0.5">
+          <div className="glass-card-premium rounded-xl hover:border-accent-cyan/20 transition-all duration-300 hover:-translate-y-1">
             <div className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0 ring-1 ring-accent-cyan/20">
                     <Users className="w-4 h-4 text-accent-cyan" />
                   </div>
                   <div className="min-w-0">
@@ -71,30 +71,30 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
                 </div>
                 {lead.intent_score >= 0.7 && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 font-semibold shrink-0">
-                    <CheckCircle className="w-3 h-3" />
+                    <Zap className="w-3 h-3" />
                     {scorePercent}%
                   </span>
                 )}
               </div>
               {lead.post_text && (
-                <p className="text-xs text-ice/70 leading-relaxed line-clamp-3 mb-3">
-                  <Quote className="w-3 h-3 text-ice/30 inline-block mr-1" />
+                <p className="text-xs text-ice/70 leading-relaxed line-clamp-3 mb-3 font-light">
+                  <Quote className="w-3 h-3 text-accent-cyan/30 inline-block mr-1" />
                   {lead.post_text}
                 </p>
               )}
               <div className="flex items-center gap-2 text-[11px] text-ice/40">
                 {lead.post_url && (
-                  <span className="flex items-center gap-1 text-ice/50">
+                  <span className="flex items-center gap-1 text-accent-cyan/60">
                     <ExternalLink className="w-3 h-3" />
                     View Post
                   </span>
                 )}
                 {lead.intent_reason && (
-                  <span className="truncate italic">{lead.intent_reason}</span>
+                  <span className="truncate italic text-ice/40">{lead.intent_reason}</span>
                 )}
               </div>
             </div>
-            <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[10px] font-semibold text-steel group-hover:text-ice transition-colors">
+            <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[10px] font-semibold text-accent-cyan/50 group-hover:text-accent-cyan transition-colors">
               <span>View Lead</span>
               <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
             </div>
@@ -114,9 +114,8 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
       transition={{ duration: 0.4, delay: index * 0.08, ease: 'easeOut' }}
     >
       <Link href={`/dashboard/leads/${lead.id}`} className="block group">
-        <div className="relative bg-gradient-to-br from-ocean/20 to-navy/80 rounded-xl border border-ocean/30 hover:border-steel/40 transition-all duration-300 overflow-hidden hover:shadow-lg hover:shadow-steel/10 hover:-translate-y-0.5">
-          <div className="absolute inset-0 bg-gradient-to-br from-steel/[0.02] to-transparent pointer-events-none" />
-          <div className="p-4 relative z-10">
+        <div className="glass-card-premium rounded-xl hover:border-steel/30 transition-all duration-300 hover:-translate-y-1">
+          <div className="p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Badge
@@ -135,7 +134,7 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
                   </span>
                 )}
               </div>
-              <span className="text-[10px] text-ice/40 font-medium">{index + 1}</span>
+              <span className="text-[10px] text-ice/30 font-mono">#{index + 1}</span>
             </div>
             <h4 className="text-sm font-bold text-offwhite mb-1.5 truncate group-hover:text-steel transition-colors">
               {lead.business_name || 'Unknown Business'}
@@ -147,7 +146,7 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
                   {lead.rating}
                 </span>
               )}
-              {lead.category && <span>{lead.category}</span>}
+              {lead.category && <span className="text-ice/40">{lead.category}</span>}
             </div>
             <div className="space-y-1 text-[11px] text-ice/60">
               {lead.phone && (
@@ -166,7 +165,7 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
               </div>
             </div>
           </div>
-          <div className="px-4 py-2 border-t border-ocean/20 flex items-center justify-between text-[10px] font-semibold text-steel group-hover:text-ice transition-colors">
+          <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[10px] font-semibold text-steel/60 group-hover:text-steel transition-colors">
             <span>View Profile</span>
             <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
           </div>
@@ -255,38 +254,64 @@ export default function SearchPage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-offwhite tracking-tight">New Search</h1>
-          <p className="text-ice/60 mt-2">Find and qualify leads from multiple sources.</p>
+          <h1 className="text-3xl font-bold text-offwhite tracking-tight">
+            <span className="gradient-text">New Search</span>
+          </h1>
+          <p className="text-ice/50 mt-2 text-sm">Find and qualify leads from multiple sources.</p>
         </div>
         {activeSearchId && (
-          <button onClick={() => { clearActiveSearch(); }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all text-sm"
+          <LoadingButton
+            onClick={() => { clearActiveSearch(); }}
+            variant="glass"
+            size="md"
+            icon={<ArrowRight className="w-4 h-4" />}
           >
             New Search
-          </button>
+          </LoadingButton>
         )}
       </div>
 
-      {/* Source selector */}
       {!isSearchActive && !progress && (
-        <div className="flex gap-1.5 bg-navy/60 p-1 rounded-xl border border-ocean/30 w-fit">
+        <div className="flex gap-1.5 bg-navy/40 p-1 rounded-2xl border border-ocean/20 backdrop-blur-sm w-fit card-glow">
           <button
             onClick={() => setSource('google_maps')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              source === 'google_maps' ? 'bg-steel/20 text-offwhite shadow-sm' : 'text-ice/50 hover:text-ice/80'
+            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+              source === 'google_maps'
+                ? 'text-offwhite shadow-lg shadow-steel/20'
+                : 'text-ice/40 hover:text-ice/70'
             }`}
           >
-            <MapPin className="w-4 h-4" />
-            Google Maps
+            {source === 'google_maps' && (
+              <motion.div
+                layoutId="source-bg"
+                className="absolute inset-0 bg-gradient-to-r from-steel/25 to-steel/10 rounded-xl border border-steel/20"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Google Maps
+            </span>
           </button>
           <button
             onClick={() => setSource('linkedin')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              source === 'linkedin' ? 'bg-accent-cyan/15 text-offwhite shadow-sm border border-accent-cyan/20' : 'text-ice/50 hover:text-ice/80'
+            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
+              source === 'linkedin'
+                ? 'text-offwhite shadow-lg shadow-accent-cyan/10'
+                : 'text-ice/40 hover:text-ice/70'
             }`}
           >
-            <Linkedin className="w-4 h-4" />
-            LinkedIn
+            {source === 'linkedin' && (
+              <motion.div
+                layoutId="source-bg"
+                className="absolute inset-0 bg-gradient-to-r from-accent-cyan/20 to-accent-purple/10 rounded-xl border border-accent-cyan/20"
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-2">
+              <Linkedin className="w-4 h-4" />
+              LinkedIn
+            </span>
           </button>
         </div>
       )}
@@ -301,20 +326,23 @@ export default function SearchPage() {
             transition={{ duration: 0.3 }}
           >
             {source === 'google_maps' ? (
-              <GlassCard className="p-8 max-w-3xl mx-auto border-ocean/40 bg-gradient-to-br from-ocean/30 to-navy">
+              <div className="glass-card-premium rounded-2xl p-8 max-w-3xl mx-auto border-ocean/20">
                 <form onSubmit={mapsForm.handleSubmit(onSubmitMaps)} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-ice/80 mb-2">Target Niche</label>
-                      <div className="relative">
+                      <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-steel" />
+                        Target Niche
+                      </label>
+                      <div className="relative group">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Briefcase className="h-5 w-5 text-steel" />
+                          <Briefcase className="h-5 w-5 text-steel/60 group-focus-within:text-steel transition-colors" />
                         </div>
                         <input
                           {...mapsForm.register('niche')}
                           type="text"
                           placeholder="e.g. Plumbers, Dentists"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-steel/40 focus:border-steel/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
                         />
                       </div>
                       {mapsForm.formState.errors.niche && (
@@ -322,16 +350,19 @@ export default function SearchPage() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-ice/80 mb-2">Location</label>
-                      <div className="relative">
+                      <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-steel" />
+                        Location
+                      </label>
+                      <div className="relative group">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <MapPin className="h-5 w-5 text-steel" />
+                          <Globe className="h-5 w-5 text-steel/60 group-focus-within:text-steel transition-colors" />
                         </div>
                         <input
                           {...mapsForm.register('location')}
                           type="text"
                           placeholder="e.g. Dallas TX, London UK"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-steel/40 focus:border-steel/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
                         />
                       </div>
                       {mapsForm.formState.errors.location && (
@@ -341,9 +372,8 @@ export default function SearchPage() {
                   </div>
                   <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
                 </form>
-              </GlassCard>
+              </div>
             ) : (
-              /* LinkedIn Search Form */
               <div className="max-w-3xl mx-auto">
                 {linkedinSessionOk === false ? (
                   <LinkedInCookieImport
@@ -355,74 +385,95 @@ export default function SearchPage() {
                     onRetry={() => setLinkedinSessionOk(null)}
                   />
                 ) : (
-                  <GlassCard className="p-8 border-ocean/40 bg-gradient-to-br from-ocean/30 to-navy">
+                  <div className="glass-card-premium rounded-2xl p-8 border-accent-cyan/10">
                     <form onSubmit={(e) => { e.preventDefault(); onSubmitLinkedin(); }} className="space-y-6">
                       <div>
-                        <label className="block text-sm font-medium text-ice/80 mb-2">Keyword</label>
-                        <div className="relative">
+                        <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
+                          <Hash className="w-4 h-4 text-accent-cyan" />
+                          Keyword
+                        </label>
+                        <div className="relative group">
                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <SearchIcon className="h-5 w-5 text-accent-cyan" />
+                            <SearchIcon className="h-5 w-5 text-accent-cyan/60 group-focus-within:text-accent-cyan transition-colors" />
                           </div>
                           <input
                             value={linkedinKeyword}
                             onChange={(e) => setLinkedinKeyword(e.target.value)}
                             type="text"
                             placeholder="e.g. AI automation, website development..."
-                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan transition-all text-offwhite text-lg placeholder-ice/40"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-accent-cyan/40 focus:border-accent-cyan/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
                           />
                         </div>
                       </div>
 
                       <div>
                         <div className="flex items-center gap-2 mb-3">
-                          <Users className="w-4 h-4 text-ice/50" />
-                          <span className="text-xs text-ice/50 font-semibold uppercase tracking-wider">Lead Type</span>
+                          <Filter className="w-4 h-4 text-ice/50" />
+                          <span className="text-xs text-ice/50 font-semibold uppercase tracking-widest">Lead Type</span>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {LEAD_TYPE_OPTIONS.map((opt) => (
-                            <button
+                            <motion.button
                               key={opt.value}
                               type="button"
                               onClick={() => setLinkedinLeadType(opt.value)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className={`relative px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                                 linkedinLeadType === opt.value
-                                  ? 'bg-accent-purple/15 text-accent-purple border border-accent-purple/30'
-                                  : 'bg-navy/80 text-ice/50 border border-ocean/30 hover:border-ocean/60'
+                                  ? 'bg-gradient-to-r from-accent-purple/20 to-accent-purple/10 text-accent-purple border border-accent-purple/30 shadow-lg shadow-accent-purple/10'
+                                  : 'bg-navy/40 text-ice/40 border border-ocean/20 hover:border-ocean/40 hover:text-ice/60'
                               }`}
                               title={opt.desc}
                             >
-                              {opt.label}
-                            </button>
+                              {linkedinLeadType === opt.value && (
+                                <motion.div
+                                  layoutId="lead-type-bg"
+                                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-accent-purple/15 to-transparent"
+                                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                />
+                              )}
+                              <span className="relative z-10">{opt.label}</span>
+                            </motion.button>
                           ))}
                         </div>
                       </div>
 
                       <div>
                         <div className="flex items-center gap-2 mb-3">
-                          <Clock className="w-4 h-4 text-ice/50" />
-                          <span className="text-xs text-ice/50 font-semibold uppercase tracking-wider">Time Filter</span>
+                          <Activity className="w-4 h-4 text-ice/50" />
+                          <span className="text-xs text-ice/50 font-semibold uppercase tracking-widest">Time Filter</span>
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {LINKEDIN_TIME_OPTIONS.map((opt) => (
-                            <button
+                            <motion.button
                               key={opt.value}
                               type="button"
                               onClick={() => setLinkedinTimeFilter(opt.value)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className={`relative px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                                 linkedinTimeFilter === opt.value
-                                  ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30'
-                                  : 'bg-navy/80 text-ice/50 border border-ocean/30 hover:border-ocean/60'
+                                  ? 'bg-gradient-to-r from-accent-cyan/20 to-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 shadow-lg shadow-accent-cyan/10'
+                                  : 'bg-navy/40 text-ice/40 border border-ocean/20 hover:border-ocean/40 hover:text-ice/60'
                               }`}
                             >
-                              {opt.label}
-                            </button>
+                              {linkedinTimeFilter === opt.value && (
+                                <motion.div
+                                  layoutId="time-bg"
+                                  className="absolute inset-0 rounded-xl bg-gradient-to-r from-accent-cyan/15 to-transparent"
+                                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                />
+                              )}
+                              <span className="relative z-10">{opt.label}</span>
+                            </motion.button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="bg-accent-cyan/5 p-4 rounded-xl border border-accent-cyan/15 flex items-start gap-3">
+                      <div className="bg-gradient-to-r from-accent-cyan/[0.04] to-accent-purple/[0.04] p-4 rounded-xl border border-accent-cyan/10 flex items-start gap-3 neon-glow">
                         <Sparkles className="w-5 h-5 text-accent-cyan shrink-0 mt-0.5" />
-                        <p className="text-sm text-ice/70 leading-relaxed">
+                        <p className="text-sm text-ice/60 leading-relaxed">
                           Hyperclients will search LinkedIn for people expressing buying intent, score them with AI, and deliver qualified leads. Results typically in 1-3 minutes.
                         </p>
                       </div>
@@ -433,13 +484,14 @@ export default function SearchPage() {
                         <button
                           type="button"
                           onClick={() => setLinkedinSessionOk(false)}
-                          className="text-xs text-ice/40 hover:text-ice/60 transition-colors"
+                          className="text-xs text-ice/30 hover:text-ice/50 transition-colors flex items-center gap-1.5"
                         >
+                          <Cookie className="w-3 h-3" />
                           Re-import cookies
                         </button>
                       </div>
                     </form>
-                  </GlassCard>
+                  </div>
                 )}
               </div>
             )}
@@ -457,7 +509,6 @@ export default function SearchPage() {
         )}
       </AnimatePresence>
 
-      {/* Live results */}
       {(progress || results.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -469,11 +520,13 @@ export default function SearchPage() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-steel" />
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-steel/20 to-ocean/20 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-steel" />
+                  </div>
                   <h2 className="text-lg font-bold text-offwhite tracking-tight">Live Results</h2>
                 </div>
-                <span className="text-sm text-ice/60 font-medium">
-                  {results.length}{resultsTotal > results.length ? ` / ${resultsTotal}` : ''} found
+                <span className="text-sm text-ice/40 font-mono">
+                  {results.length}{resultsTotal > results.length ? ' / ' + resultsTotal : ''} found
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -484,26 +537,22 @@ export default function SearchPage() {
               {!isSearchActive && resultsTotal > 0 && (
                 <div className="flex justify-center mt-6 gap-4">
                   <Link href="/dashboard/leads"
-                    className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-offwhite bg-gradient-to-r from-steel to-ocean hover:from-steel/90 hover:to-ocean/90 transition-all shadow-[0_0_20px_rgba(74,127,167,0.4)] hover:shadow-[0_0_30px_rgba(74,127,167,0.6)]"
+                    className="btn-gradient-cyan inline-flex items-center justify-center px-6 py-2.5 rounded-xl text-sm shadow-lg hover:-translate-y-0.5 transition-all"
                   >
                     View All Leads in Dashboard
                   </Link>
-                  <button onClick={() => { clearActiveSearch(); }}
-                    className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all"
-                  >
+                  <LoadingButton onClick={() => { clearActiveSearch(); }} variant="glass" size="md">
                     New Search
-                  </button>
+                  </LoadingButton>
                 </div>
               )}
             </>
           )}
           {!isSearchActive && progress && ['completed', 'failed', 'cancelled'].includes(progress.status ?? '') && (
             <div className="flex justify-center mt-6">
-              <button onClick={() => { clearActiveSearch(); }}
-                className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all"
-              >
+              <LoadingButton onClick={() => { clearActiveSearch(); }} variant="glass" size="md">
                 New Search
-              </button>
+              </LoadingButton>
             </div>
           )}
         </motion.div>
@@ -542,7 +591,7 @@ function SearchInfoSection({ isAtLimit, remaining, searchesPerDay, isStarting }:
           isLoading={isStarting}
           size="lg"
           fullWidth={false}
-          variant={isAtLimit ? 'outline' : 'gradient'}
+          variant={isAtLimit ? 'outline' : 'gradient-cyan'}
           className="text-lg py-4 px-8"
           disabled={isAtLimit}
         >
@@ -568,9 +617,9 @@ function LinkedInCookieImport({
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="glass rounded-2xl p-8 md:p-12 max-w-md mx-auto text-center"
+      className="glass-card-premium rounded-2xl p-8 md:p-12 max-w-md mx-auto text-center border-accent-cyan/10"
     >
-      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center mx-auto mb-5">
+      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center mx-auto mb-5 ring-1 ring-accent-cyan/20">
         <Linkedin className="w-8 h-8 text-accent-cyan" />
       </div>
       <h2 className="text-xl font-bold text-offwhite mb-2">LinkedIn Session Required</h2>
@@ -584,7 +633,7 @@ function LinkedInCookieImport({
         value={cookieJson}
         onChange={(e) => onCookieChange(e.target.value)}
         disabled={isImporting}
-        className="w-full px-4 py-3 rounded-xl text-sm bg-navy/80 border border-ocean/50 text-offwhite placeholder-ice/40 focus:outline-none focus:border-accent-cyan/50 mb-4 resize-none font-mono"
+        className="w-full px-4 py-3 rounded-xl text-sm bg-navy/60 border border-ocean/30 text-offwhite placeholder-ice/30 focus:outline-none focus:border-accent-cyan/50 focus:ring-1 focus:ring-accent-cyan/30 mb-4 resize-none font-mono transition-all"
       />
 
       {importError && (
@@ -593,23 +642,21 @@ function LinkedInCookieImport({
         </div>
       )}
 
-      <motion.button
+      <button
         onClick={onImport}
         disabled={isImporting || !cookieJson.trim()}
-        whileHover={{ scale: cookieJson.trim() ? 1.02 : 1 }}
-        whileTap={{ scale: cookieJson.trim() ? 0.98 : 1 }}
-        className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-accent-cyan to-accent-purple text-white hover:opacity-90 shadow-lg shadow-accent-cyan/20 disabled:opacity-50 transition-all"
+        className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-gradient-cyan disabled:opacity-50 transition-all"
       >
         {isImporting ? (
           <><Loader2 className="w-4 h-4 animate-spin" /> Importing...</>
         ) : (
           <><LogIn className="w-4 h-4" /> Import Cookies</>
         )}
-      </motion.button>
+      </button>
 
       <button
         onClick={onRetry}
-        className="text-xs text-ice/40 hover:text-ice/60 mt-4 transition-colors"
+        className="text-xs text-ice/30 hover:text-ice/50 mt-4 transition-colors"
       >
         Check session status
       </button>
