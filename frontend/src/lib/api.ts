@@ -11,6 +11,8 @@ const api = axios.create({
   timeout: 30000,
 });
 
+let refreshPromise: Promise<any> | null = null;
+
 api.interceptors.request.use(async (config) => {
   if (isBrowser) {
     const { data: { session } } = await supabase.auth.getSession();
@@ -26,13 +28,18 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401 && isBrowser && !error.config._retry) {
       error.config._retry = true;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data, error: refreshError } = await supabase.auth.refreshSession();
-        if (data?.session) {
-          error.config.headers.Authorization = `Bearer ${data.session.access_token}`;
-          return api(error.config);
+      if (!refreshPromise) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          refreshPromise = supabase.auth.refreshSession().finally(() => {
+            refreshPromise = null;
+          });
         }
+      }
+      const { data } = await refreshPromise!;
+      if (data?.session) {
+        error.config.headers.Authorization = `Bearer ${data.session.access_token}`;
+        return api(error.config);
       }
       window.location.href = '/login';
     }

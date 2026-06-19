@@ -341,15 +341,13 @@ async def cancel_search_endpoint(
                 detail=f"Cannot cancel a search with status '{search['status']}'",
             )
 
-        # Signal cancellation to the pipeline
         cancel_search(search_id)
 
-        # Update status immediately
         supabase.table("searches").update({
             "status": "cancelled",
             "message": "Search cancelled by user",
             "completed_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", search_id).execute()
+        }).eq("id", search_id).not_.in_("status", ["completed", "failed", "cancelled"]).execute()
 
         return {"message": "Search cancelled", "id": search_id}
 

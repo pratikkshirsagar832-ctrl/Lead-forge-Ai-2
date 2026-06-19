@@ -15,10 +15,11 @@ SAMESITE_MAP = {
 
 
 class LinkedInSessionManager:
-    def __init__(self, cookie_dir: str = "./sessions"):
+    def __init__(self, cookie_dir: str = "./sessions", user_id: str = ""):
         self.cookie_dir = Path(cookie_dir)
         self.cookie_dir.mkdir(parents=True, exist_ok=True)
-        self.session_file = self.cookie_dir / "linkedin_session.json"
+        suffix = f"_{user_id}" if user_id else ""
+        self.session_file = self.cookie_dir / f"linkedin_session{suffix}.json"
 
     def save_cookies(self, cookies: list[dict]) -> None:
         sanitized = self._sanitize_cookies(cookies)

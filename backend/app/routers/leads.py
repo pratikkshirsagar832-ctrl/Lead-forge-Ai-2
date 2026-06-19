@@ -110,6 +110,8 @@ async def list_leads(
         raise HTTPException(status_code=500, detail=f"Failed to fetch leads: {str(e)}")
 
 
+EXPORT_MAX_ROWS = 10000
+
 @router.get("/export")
 async def export_leads_csv(
     search_id: Optional[str] = Query(None, description="Filter by search ID"),
@@ -119,7 +121,7 @@ async def export_leads_csv(
     search: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Export leads as a CSV file."""
+    """Export leads as a CSV file (max 10,000 rows)."""
     supabase = get_supabase_admin()
     user_id = current_user["id"]
 
@@ -136,11 +138,10 @@ async def export_leads_csv(
         if search:
             query = query.ilike("business_name", f"%{search}%")
 
-        query = query.order("created_at", desc=True)
+        query = query.order("created_at", desc=True).limit(EXPORT_MAX_ROWS)
         response = query.execute()
         leads = response.data or []
 
-        # Generate CSV
         output = io.StringIO()
         fieldnames = [
             "business_name", "category", "full_address", "phone",
@@ -209,7 +210,7 @@ async def analyze_lead_website(
         emails = result.get("emails_found", [])
         if emails and not lead.get("email_found"):
             update_data["email_found"] = emails[0]
-        supabase.table("leads").update(update_data).eq("id", lead_id).execute()
+        supabase.table("leads").update(update_data).eq("id", lead_id).eq("user_id", current_user["id"]).execute()
 
         return {
             "status": "ok",

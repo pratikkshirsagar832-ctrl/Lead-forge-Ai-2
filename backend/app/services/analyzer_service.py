@@ -1,13 +1,10 @@
 """
 Hyperclients — Website Analyzer Service
 
-Enhanced wrapper that combines multi-page crawling with OpenAI deep analysis.
-Delegates the heavy crawling to enhanced_analyzer, then passes the enriched
-data to AI for assessment.
-
+Orchestrates Scrapling extraction + OpenAI deep analysis.
 Flow:
-  1. enhanced_analyzer.analyze_website(url)  — multi-page crawl + signals
-  2. batch_deep_analyze([data])  — AI quality assessment
+  1. enhanced_analyzer.analyze_website(url) — multi-page crawl + signal extraction (NO scoring)
+  2. batch_deep_analyze([data]) — AI quality assessment (PRIMARY scoring engine)
   3. Merge results and return
 """
 
@@ -23,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def analyze_website(url: str) -> dict[str, Any]:
     result = await enhanced_analyze(url)
 
-    if result.get("overall_score", 0) < 20:
+    if "error" in result.get("raw_analysis", {}):
         return result
 
     try:

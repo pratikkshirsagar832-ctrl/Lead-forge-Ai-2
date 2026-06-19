@@ -1,15 +1,8 @@
 """
 Hyperclients — Enhanced Website Analyzer
 
-Replaces the old single-page Scrapling analysis with:
-  - Multi-page crawling (Homepage + About + Services + Pricing + Contact + Team)
-  - Dynamic rendering fallback (Playwright for JS-heavy sites)
-  - Proper JSON-LD / structured data extraction
-  - Full Open Graph / Twitter card value extraction
-  - Clean content extraction via readability/trafilatura
-  - Social media profile URL resolution
-
-All analysis is on-demand per lead.
+Uses Scrapling for multi-page crawling and signal extraction only.
+No rule-based scoring — all scoring is delegated to OpenAI via deep_analyzer.
 """
 
 import json
@@ -69,10 +62,7 @@ async def analyze_website(url: str) -> dict[str, Any]:
     base_domain = parsed.netloc
     base_url = f"{parsed.scheme}://{parsed.netloc}"
 
-    deductions: list[dict] = []
-    bonuses: list[dict] = []
     issues: list[str] = []
-    score = 100
     emails_found: list[str] = []
     phones_found: list[str] = []
     all_social_urls: dict[str, list[str]] = {}
@@ -81,14 +71,9 @@ async def analyze_website(url: str) -> dict[str, Any]:
     schema_data: list[dict] = []
     pages_crawled: list[str] = []
 
-    def add_deduction(reason: str, pts: int, severity: str = "medium"):
-        deductions.append({"reason": reason, "points": -pts, "severity": severity})
-        issues.append(reason)
-        return -pts
-
-    def add_bonus(reason: str, pts: int):
-        bonuses.append({"reason": reason, "points": pts, "severity": "bonus"})
-        return pts
+    def add_issue(reason: str):
+        if reason not in issues:
+            issues.append(reason)
 
     try:
         home_response = await _fetch_page(url)
@@ -135,7 +120,6 @@ async def analyze_website(url: str) -> dict[str, Any]:
                     parsed = urlparse(final_url)
                     base_domain = parsed.netloc
                     base_url = f"{parsed.scheme}://{parsed.netloc}"
-                    add_bonus("Dynamic rendering used (JavaScript site)", 5)
             except Exception as e:
                 logger.warning(f"[Analyzer] DynamicFetcher failed for {url}: {e}")
 
@@ -176,28 +160,23 @@ async def analyze_website(url: str) -> dict[str, Any]:
             "final_url": final_url,
             "pages_crawled": pages_crawled,
             "page_count": page_count,
+            "is_spa": is_spa,
+            "dynamic_rendering": is_spa,
         }
-        if page_count >= 3:
-            add_bonus(f"Deep crawl: {page_count} pages analyzed", 5)
-
-        if is_spa:
-            raw["dynamic_rendering"] = True
 
         raw["content_length"] = len(home_response.body or b"")
         raw["page_size_kb"] = round(len(home_response.body or b"") / 1024, 1)
         raw["visible_text_length"] = len(home_text)
 
-        if is_spa:
-            pass
-        elif raw["page_size_kb"] > 3000:
-            score += add_deduction(f"Very large page ({raw['page_size_kb']:.0f} KB)", 5, "medium")
+        if raw["page_size_kb"] > 3000:
+            add_issue(f"Very large page ({raw['page_size_kb']:.0f} KB)")
         elif raw["page_size_kb"] < 5 and not is_spa:
-            score += add_deduction("Suspiciously small page", 5, "medium")
+            add_issue("Suspiciously small page")
 
         if len(home_text) < 200 and not is_spa:
-            score += add_deduction("Very thin content", 15, "critical")
+            add_issue("Very thin content")
         elif len(home_text) < 500 and not is_spa:
-            score += add_deduction("Thin content", 8, "major")
+            add_issue("Thin content")
 
         title_el = home_response.css("title::text")
         title = str(title_el.get() or "")
@@ -219,60 +198,50 @@ async def analyze_website(url: str) -> dict[str, Any]:
         raw["twitter_values"] = twitter_values
 
         if not title and not og_title:
-            score += add_deduction("Missing page title", 10, "critical")
+            add_issue("Missing page title")
         elif (title and len(title.strip()) < 10) and not og_title:
-            score += add_deduction("Title too short", 5, "medium")
-        if og_image:
-            add_bonus("Open Graph image set (good social sharing)", 2)
+            add_issue("Title too short")
 
         meta_el = home_response.find("meta", {"name": "description"})
         desc = meta_el.attrib.get("content", "") if meta_el else (og_desc or "")
         raw["meta_description"] = desc or ""
         if not desc and not og_desc:
-            score += add_deduction("Missing meta description", 10, "critical")
+            add_issue("Missing meta description")
         elif desc and len(desc.strip()) < 50:
-            score += add_deduction("Meta description too short", 5, "medium")
+            add_issue("Meta description too short")
 
         html_el = home_response.find("html")
         lang = html_el.attrib.get("lang", "") if html_el else ""
         raw["language"] = lang or ""
         if not lang:
-            score += add_deduction("Missing HTML lang attribute", 3, "minor")
+            add_issue("Missing HTML lang attribute")
 
         canonical_el = home_response.find("link", {"rel": "canonical"})
         canonical_href = canonical_el.attrib.get("href", "") if canonical_el else ""
         raw["canonical_url"] = canonical_href or ""
         if not canonical_href:
-            score += add_deduction("No canonical tag", 3, "minor")
+            add_issue("No canonical tag")
 
         raw["schema_count"] = len(schema_data)
         raw["has_structured_data"] = len(schema_data) > 0
         raw["schema_types"] = sorted(set(
             s.get("@type", "") for s in schema_data
         ))
-        if schema_data:
-            add_bonus(f"Structured data found ({len(schema_data)} blocks)", 3)
-            business_info = _extract_business_info(schema_data)
-            raw["business_info"] = business_info
-            if business_info.get("name"):
-                add_bonus("LocalBusiness/Organization schema complete", 2)
-            if business_info.get("opening_hours"):
-                add_bonus("Business hours in structured data", 2)
-            if business_info.get("social_profiles"):
-                add_bonus("Social profiles in schema", 1)
-        else:
-            score += add_deduction("No structured data (schema.org)", 5, "medium")
+        business_info = _extract_business_info(schema_data) if schema_data else {}
+        raw["business_info"] = business_info
+        if not schema_data:
+            add_issue("No structured data (schema.org)")
         raw["schema_data"] = schema_data
 
         og_count = len(og_values)
         raw["og_tags_count"] = og_count
         if og_count < 3:
-            score += add_deduction("Poor social sharing (missing Open Graph tags)", 5, "medium")
+            add_issue("Poor social sharing (missing Open Graph tags)")
 
         twitter_count = len(twitter_values)
         raw["twitter_card_count"] = twitter_count
         if twitter_count < 2:
-            score += add_deduction("Twitter Card meta tags incomplete", 3, "minor")
+            add_issue("Twitter Card meta tags incomplete")
 
         has_favicon = bool(
             home_response.css('link[rel="icon"]')
@@ -280,10 +249,8 @@ async def analyze_website(url: str) -> dict[str, Any]:
             or home_response.css('link[rel="apple-touch-icon"]')
         )
         raw["has_favicon"] = has_favicon
-        if has_favicon:
-            add_bonus("Favicon present", 1)
-        else:
-            score += add_deduction("No favicon", 3, "minor")
+        if not has_favicon:
+            add_issue("No favicon")
 
         emails_found = _extract_emails(combined_text)
         phones_found = _extract_phones(combined_text)
@@ -295,43 +262,33 @@ async def analyze_website(url: str) -> dict[str, Any]:
         raw["social_platforms"] = list(all_social_urls.keys())
         raw["social_count"] = len(all_social_urls)
         if not all_social_urls:
-            score += add_deduction("No social media presence", 5, "medium")
-        elif len(all_social_urls) >= 3:
-            add_bonus("Good social media presence (3+ platforms)", 5)
+            add_issue("No social media presence")
 
         has_tel = bool(re.search(r'tel:\+?\d+', html_lower))
         if phones_found and not has_tel:
-            score += add_deduction("Phone number not clickable (no tel: link)", 2, "major")
+            add_issue("Phone number not clickable (no tel: link)")
         has_mailto = bool(re.search(r'mailto:', html_lower))
         if emails_found and not has_mailto:
-            score += add_deduction("Email not clickable (no mailto: link)", 2, "major")
+            add_issue("Email not clickable (no mailto: link)")
 
         is_https = final_url.startswith("https://")
         raw["is_https"] = is_https
         if not is_https:
-            score += add_deduction("No HTTPS", 15, "critical")
+            add_issue("No HTTPS")
 
         if _is_parked(home_text):
-            score += add_deduction("Site appears parked or default template", 25, "critical")
+            add_issue("Site appears parked or default template")
 
         if _has_broken_layout(html_lower):
-            score += add_deduction("Outdated or broken layout", 10, "critical")
+            add_issue("Outdated or broken layout")
 
         has_viewport = bool(home_response.find("meta", {"name": "viewport"}))
         raw["has_viewport"] = has_viewport
-        if has_viewport:
-            add_bonus("Mobile-friendly viewport meta present", 2)
-        else:
-            score += add_deduction("Not mobile-friendly (no viewport meta)", 10, "critical")
+        if not has_viewport:
+            add_issue("Not mobile-friendly (no viewport meta)")
 
         framework = _detect_framework(html_lower)
         raw["framework"] = framework
-        if framework == "none":
-            score += add_deduction("No modern CMS/framework detected", 5, "medium")
-        elif framework in ("wix", "squarespace", "shopify", "webflow"):
-            add_bonus(f"Built on {framework} (modern platform)", 5)
-        elif framework == "wordpress":
-            add_bonus("Built on WordPress (easy to edit)", 3)
 
         headings = {}
         for tag in ["h1", "h2", "h3", "h4", "h5", "h6"]:
@@ -339,11 +296,9 @@ async def analyze_website(url: str) -> dict[str, Any]:
             headings[tag] = len(els)
         raw["headings"] = headings
         if headings["h1"] == 0:
-            score += add_deduction("No H1 heading", 5, "medium")
+            add_issue("No H1 heading")
         elif headings["h1"] > 1:
-            score += add_deduction(f"Multiple H1 tags ({headings['h1']})", 3, "minor")
-        if headings["h1"] == 1:
-            add_bonus("Single H1 heading (proper structure)", 2)
+            add_issue(f"Multiple H1 tags ({headings['h1']})")
 
         all_links = home_response.css("a[href]")
         internal = 0; external = 0; nofollow = 0; broken_links = 0
@@ -367,11 +322,11 @@ async def analyze_website(url: str) -> dict[str, Any]:
         raw["total_links"] = total_links
         raw["broken_links"] = broken_links
         if total_links == 0:
-            score += add_deduction("No internal links found", 5, "medium")
+            add_issue("No internal links found")
         elif external > 0 and total_links > 0 and external / total_links > 0.5:
-            score += add_deduction("Most links point to external sites", 3, "minor")
+            add_issue("Most links point to external sites")
         if broken_links > 0:
-            score += add_deduction(f"Found {broken_links} broken/empty link(s)", 3, "major")
+            add_issue(f"Found {broken_links} broken/empty link(s)")
 
         images = home_response.css("img[src]")
         total_imgs = len(images)
@@ -391,28 +346,22 @@ async def analyze_website(url: str) -> dict[str, Any]:
         raw["images_lazy_loaded"] = lazy_loaded
         raw["images_webp"] = webp_count
         if total_imgs > 0 and no_alt / total_imgs > 0.5:
-            score += add_deduction("Many images missing alt text", 5, "medium")
+            add_issue("Many images missing alt text")
         if total_imgs > 0 and webp_count / total_imgs < 0.3:
-            score += add_deduction("Most images not in WebP/AVIF format", 3, "minor")
+            add_issue("Most images not in WebP/AVIF format")
 
         has_ga = bool(
             re.search(r'gtag\s*\(|google-analytics\.com|googletagmanager\.com', html_lower)
         )
         raw["has_analytics"] = has_ga
-        if has_ga:
-            add_bonus("Analytics (GA4/GTM) detected", 1)
-        else:
-            score += add_deduction("No analytics detected (GA4/GTM)", 3, "minor")
+        if not has_ga:
+            add_issue("No analytics detected (GA4/GTM)")
 
         has_cookie_banner = bool(
             re.search(r'cookie[-_]?(consent|banner|notice|popup|bar)', html_lower)
             or home_response.css('[class*="cookie"], [id*="cookie"], [class*="CookieConsent"]')
         )
         raw["has_cookie_consent"] = has_cookie_banner
-        if has_cookie_banner:
-            add_bonus("Cookie consent banner present", 1)
-        else:
-            score += add_deduction("No cookie consent banner detected", 2, "minor")
 
         forms = home_response.css("form")
         raw["form_count"] = len(forms)
@@ -426,48 +375,38 @@ async def analyze_website(url: str) -> dict[str, Any]:
             home_response.css("nav, header nav, .nav, .navbar, #nav, #navbar")
         )
         raw["has_navigation"] = has_nav
-        if has_nav:
-            add_bonus("Navigation menu present", 2)
-        else:
-            score += add_deduction("No visible navigation", 5, "medium")
+        if not has_nav:
+            add_issue("No visible navigation")
 
         cta_text_found = any(kw in html_lower[:3000] for kw in CTA_KEYWORDS)
         raw["cta_text_found"] = cta_text_found
         if not cta_text_found:
-            score += add_deduction("No clear CTA button (Contact/Book/Quote) detected", 4, "critical")
+            add_issue("No clear CTA button (Contact/Book/Quote) detected")
 
         has_value_prop = any(kw in home_text[:2000] for kw in VP_KEYWORDS)
         raw["has_value_proposition"] = has_value_prop
-        if has_value_prop:
-            add_bonus("Clear value proposition in hero section", 1)
-        else:
-            score += add_deduction("No clear value proposition above the fold", 2, "major")
+        if not has_value_prop:
+            add_issue("No clear value proposition above the fold")
 
         has_autoplay = bool(re.search(r'autoplay|autoplay=true|autoplay=1', html_lower))
         raw["has_autoplay_media"] = has_autoplay
         if has_autoplay:
-            score += add_deduction("Auto-playing video/audio detected (bad UX)", 4, "critical")
+            add_issue("Auto-playing video/audio detected (bad UX)")
 
         has_chat = bool(
             re.search(r'live.?chat|tawk|intercom|crisp|drift|freshchat|zendesk.*chat|hubspot.*chat', html_lower)
         )
         raw["has_live_chat"] = has_chat
-        if has_chat:
-            add_bonus("Live chat widget detected (good for conversions)", 2)
 
         has_testimonials = bool(
             re.search(r'testimonial|review|rating|what.*client.*say|success.story', html_lower[:5000])
         )
         raw["has_testimonials"] = has_testimonials
-        if has_testimonials:
-            add_bonus("Testimonials/reviews section found (social proof)", 2)
 
         has_pricing = bool(
             re.search(r'pricing|our.price|plan|package', html_lower[:3000])
         )
         raw["has_pricing_page"] = has_pricing
-        if has_pricing:
-            add_bonus("Pricing page detected (transparency)", 1)
 
         has_search = bool(
             home_response.css('input[type="search"], input[name="s"], .search-form, #search')
@@ -482,7 +421,7 @@ async def analyze_website(url: str) -> dict[str, Any]:
                 has_custom_404 = not any(s in err_text for s in ["not found", "404", "page not found"])
                 raw["has_custom_404"] = has_custom_404
                 if not has_custom_404 and err_text and len(err_text) < 100:
-                    score += add_deduction("No custom 404 page (raw server error)", 2, "major")
+                    add_issue("No custom 404 page (raw server error)")
             else:
                 raw["has_custom_404"] = True
         except Exception:
@@ -495,7 +434,7 @@ async def analyze_website(url: str) -> dict[str, Any]:
         has_aria = bool(re.search(r'role=|aria-label|aria-hidden|aria-expanded', html_lower))
         raw["has_aria_attributes"] = has_aria
         if not has_aria:
-            score += add_deduction("Missing ARIA attributes (poor accessibility)", 2, "minor")
+            add_issue("Missing ARIA attributes (poor accessibility)")
 
         ai_bots_blocked = []
         try:
@@ -509,10 +448,6 @@ async def analyze_website(url: str) -> dict[str, Any]:
                         ai_bots_blocked.append(bot)
                 raw["robots_txt_found"] = True
                 raw["robots_ai_bots_blocked"] = ai_bots_blocked
-                if ai_bots_blocked:
-                    score += add_deduction(
-                        f"AI crawlers blocked in robots.txt ({', '.join(ai_bots_blocked)})", 2, "minor"
-                    )
             else:
                 raw["robots_txt_found"] = False
         except Exception:
@@ -527,23 +462,19 @@ async def analyze_website(url: str) -> dict[str, Any]:
         except Exception:
             pass
         raw["sitemap_found"] = sitemap_found
-        if sitemap_found:
-            add_bonus("XML sitemap found", 1)
-        else:
-            score += add_deduction("No XML sitemap detected", 3, "minor")
+        if not sitemap_found:
+            add_issue("No XML sitemap detected")
 
         has_footer = bool(home_response.css("footer, .footer, #footer"))
         raw["has_footer"] = has_footer
-        if has_footer:
-            add_bonus("Footer section present", 1)
-        else:
-            score += add_deduction("No footer found", 3, "minor")
+        if not has_footer:
+            add_issue("No footer found")
         if has_footer:
             copyright_match = re.search(r'©\s*(\d{4})', combined_html)
             if copyright_match:
                 year = int(copyright_match.group(1))
                 if year < 2023:
-                    score += add_deduction(f"Outdated copyright year ({year})", 2, "major")
+                    add_issue(f"Outdated copyright year ({year})")
 
         has_sticky = bool(re.search(r'position:\s*sticky|position:\s*fixed', html_lower))
         raw["has_sticky_elements"] = has_sticky
@@ -552,8 +483,6 @@ async def analyze_website(url: str) -> dict[str, Any]:
             re.search(r'(exit.?intent|modal.*show|popup.*onload|overlay.*display)', html_lower)
         )
         raw["has_aggressive_popup"] = has_aggressive_popup
-        if has_aggressive_popup:
-            score += add_deduction("Aggressive pop-up on page load", 2, "major")
 
         for page_name, page_text in all_texts.items():
             if page_name != "homepage" and len(page_text) > 100:
@@ -566,24 +495,9 @@ async def analyze_website(url: str) -> dict[str, Any]:
                     if p not in phones_found:
                         phones_found.append(p)
 
-        score = max(0, min(100, score))
-        category = "warm"
-
-        deduction_total = sum(d["points"] for d in deductions)
-        bonus_total = sum(b["points"] for b in bonuses)
-
-        raw["final_score"] = score
-        raw["score_breakdown"] = {
-            "deductions": deductions,
-            "bonuses": bonuses,
-            "deduction_total": deduction_total,
-            "bonus_total": bonus_total,
-            "summary": f"100 - {abs(deduction_total)} (deductions) + {bonus_total} (bonuses) = {score}",
-        }
-
         return {
-            "overall_score": score,
-            "category": category,
+            "overall_score": 50,
+            "category": "warm",
             "issues": issues,
             "emails_found": emails_found[:10],
             "phones_found": phones_found[:10],
@@ -827,18 +741,11 @@ def _detect_framework(html_lower: str) -> str:
 def _empty_result(reason: str) -> dict:
     return {
         "overall_score": 0,
-        "category": "warm",
+        "category": "hot",
         "issues": [reason],
         "emails_found": [],
         "phones_found": [],
         "raw_analysis": {
             "error": reason,
-            "score_breakdown": {
-                "deductions": [{"reason": reason, "points": -100, "severity": "critical"}],
-                "bonuses": [],
-                "deduction_total": -100,
-                "bonus_total": 0,
-                "summary": f"Analysis failed — {reason}",
-            },
         },
     }

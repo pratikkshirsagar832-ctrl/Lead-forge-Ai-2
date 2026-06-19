@@ -232,56 +232,62 @@ async def verify_payment(
 
     supabase = get_supabase_admin()
 
-    plan_resp = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
-    if not plan_resp.data or len(plan_resp.data) == 0:
-        raise HTTPException(status_code=404, detail="Plan not found")
+    try:
+        plan_resp = supabase.table("plans").select("*").eq("id", plan_id).limit(1).execute()
+        if not plan_resp.data or len(plan_resp.data) == 0:
+            raise HTTPException(status_code=404, detail="Plan not found")
 
-    plan = plan_resp.data[0]
+        plan = plan_resp.data[0]
+        billing_cycle_days = plan.get("billing_cycle_days", 30)
 
-    now = datetime.now(timezone.utc)
-    period_end = now + timedelta(days=30)
+        now = datetime.now(timezone.utc)
+        period_end = now + timedelta(days=int(billing_cycle_days))
 
-    existing = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).limit(1).execute()
+        existing = supabase.table("user_subscriptions").select("id").eq("user_id", current_user["id"]).limit(1).execute()
 
-    sub_data = {
-        "plan_id": plan_id,
-        "status": "active",
-        "razorpay_order_id": razorpay_order_id,
-        "current_period_start": now.isoformat(),
-        "current_period_end": period_end.isoformat(),
-    }
+        sub_data = {
+            "plan_id": plan_id,
+            "status": "active",
+            "razorpay_order_id": razorpay_order_id,
+            "current_period_start": now.isoformat(),
+            "current_period_end": period_end.isoformat(),
+        }
 
-    if existing.data and len(existing.data) > 0:
-        sub_data["razorpay_payment_id"] = razorpay_payment_id
-        sub_id = existing.data[0]["id"]
-        supabase.table("user_subscriptions").update(sub_data).eq("id", sub_id).execute()
-    else:
-        sub_data["user_id"] = current_user["id"]
-        sub_data["razorpay_payment_id"] = razorpay_payment_id
-        supabase.table("user_subscriptions").insert(sub_data).execute()
+        if existing.data and len(existing.data) > 0:
+            sub_data["razorpay_payment_id"] = razorpay_payment_id
+            sub_id = existing.data[0]["id"]
+            supabase.table("user_subscriptions").update(sub_data).eq("id", sub_id).execute()
+        else:
+            sub_data["user_id"] = current_user["id"]
+            sub_data["razorpay_payment_id"] = razorpay_payment_id
+            supabase.table("user_subscriptions").insert(sub_data).execute()
 
-    # Reset daily usage so the user gets their new plan's full limits (idempotent: delete + re-insert)
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    existing_usage = supabase.table("daily_usage").select("searches_run").eq("user_id", current_user["id"]).eq("date", today_str).execute()
-    if existing_usage.data and len(existing_usage.data) > 0:
-        supabase.table("daily_usage").update({
-            "searches_run": 0,
-            "leads_generated": 0,
-        }).eq("user_id", current_user["id"]).eq("date", today_str).execute()
-    else:
-        supabase.table("daily_usage").insert({
-            "user_id": current_user["id"],
-            "date": today_str,
-            "searches_run": 0,
-            "leads_generated": 0,
-        }).execute()
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        existing_usage = supabase.table("daily_usage").select("searches_run").eq("user_id", current_user["id"]).eq("date", today_str).execute()
+        if existing_usage.data and len(existing_usage.data) > 0:
+            supabase.table("daily_usage").update({
+                "searches_run": 0,
+                "leads_generated": 0,
+            }).eq("user_id", current_user["id"]).eq("date", today_str).execute()
+        else:
+            supabase.table("daily_usage").insert({
+                "user_id": current_user["id"],
+                "date": today_str,
+                "searches_run": 0,
+                "leads_generated": 0,
+            }).execute()
 
-    return {
-        "status": "success",
-        "plan_id": plan_id,
-        "plan_name": plan["name"],
-        "message": f"Upgraded to {plan['name']} plan",
-    }
+        return {
+            "status": "success",
+            "plan_id": plan_id,
+            "plan_name": plan["name"],
+            "message": f"Upgraded to {plan['name']} plan",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Payment verification failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Payment verification failed")
 
 
 @router.post("/webhook")

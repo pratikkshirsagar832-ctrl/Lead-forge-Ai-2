@@ -10,12 +10,17 @@ export function useSearch() {
   const [isStarting, setIsStarting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const resultsPollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const resultsPageRef = useRef(1);
-  const retryCountRef = useRef(0);
+  const statusRetryRef = useRef(0);
+  const resultsRetryRef = useRef(0);
   const pollStatusRef = useRef<((id: string) => Promise<void>) | null>(null);
   const pollResultsRef = useRef<((id: string) => Promise<void>) | null>(null);
+  const statusAbortRef = useRef<AbortController | null>(null);
+  const resultsAbortRef = useRef<AbortController | null>(null);
+  const isStartingRef = useRef(false);
 
   const clearPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -26,25 +31,38 @@ export function useSearch() {
       clearTimeout(resultsPollTimerRef.current);
       resultsPollTimerRef.current = null;
     }
-    retryCountRef.current = 0;
+    if (statusAbortRef.current) {
+      statusAbortRef.current.abort();
+      statusAbortRef.current = null;
+    }
+    if (resultsAbortRef.current) {
+      resultsAbortRef.current.abort();
+      resultsAbortRef.current = null;
+    }
+    statusRetryRef.current = 0;
+    resultsRetryRef.current = 0;
   }, []);
 
   const pollResults = useCallback(async (id: string) => {
+    resultsAbortRef.current?.abort();
+    const abort = new AbortController();
+    resultsAbortRef.current = abort;
     try {
       const page = resultsPageRef.current;
-      const { data } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=${page}&per_page=4`);
+      const { data } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=${page}&per_page=4`, { signal: abort.signal });
       if (data.items?.length > 0) {
         appendResults(data.items);
       }
       if (data.total > resultsPageRef.current * 4) {
         resultsPageRef.current += 1;
       }
-      retryCountRef.current = 0;
+      resultsRetryRef.current = 0;
       resultsPollTimerRef.current = setTimeout(() => pollResultsRef.current?.(id), 4000);
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'CanceledError' || e.code === 'ERR_CANCELED') return;
       console.warn('Poll results failed, retrying:', e);
-      retryCountRef.current += 1;
-      if (retryCountRef.current > 50) {
+      resultsRetryRef.current += 1;
+      if (resultsRetryRef.current > 50) {
         clearPolling();
         return;
       }
@@ -53,14 +71,20 @@ export function useSearch() {
   }, [appendResults, clearPolling]);
 
   const pollStatus = useCallback(async (id: string) => {
+    statusAbortRef.current?.abort();
+    const abort = new AbortController();
+    statusAbortRef.current = abort;
     try {
-      const { data } = await api.get(API_ROUTES.searches.status(id));
+      const { data } = await api.get(API_ROUTES.searches.status(id), { signal: abort.signal });
       setProgress(data);
 
       if (['completed', 'failed', 'cancelled'].includes(data.status)) {
         clearPolling();
         try {
-          const { data: finalResults } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=1&per_page=50`);
+          resultsAbortRef.current?.abort();
+          const resultsAbort = new AbortController();
+          resultsAbortRef.current = resultsAbort;
+          const { data: finalResults } = await api.get(`${API_ROUTES.searches.detail(id)}/results?page=1&per_page=50`, { signal: resultsAbort.signal });
           if (finalResults.items) {
             appendResults(finalResults.items);
           }
@@ -75,9 +99,11 @@ export function useSearch() {
           showToast('Search cancelled', 'info');
         }
       } else {
+        statusRetryRef.current = 0;
         pollTimerRef.current = setTimeout(() => pollStatusRef.current?.(id), POLLING_INTERVAL);
       }
     } catch (error: any) {
+      if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED') return;
       if (error.response?.status === 404) {
         showToast("Search not found or expired", "error");
         clearActiveSearch();
@@ -88,15 +114,16 @@ export function useSearch() {
         clearPolling();
         return;
       }
-      retryCountRef.current += 1;
-      if (retryCountRef.current > 50) {
+      statusRetryRef.current += 1;
+      if (statusRetryRef.current > 50) {
         clearPolling();
+        setError('Search polling stopped after too many retries');
         showToast('Search status polling stopped after too many retries', 'error');
         return;
       }
       pollTimerRef.current = setTimeout(() => pollStatusRef.current?.(id), POLLING_INTERVAL);
     }
-  }, [setProgress, showToast, clearActiveSearch, appendResults, clearPolling]);
+  }, [setProgress, showToast, clearActiveSearch, appendResults, clearPolling, setError]);
 
   useEffect(() => {
     pollStatusRef.current = pollStatus;
@@ -107,17 +134,20 @@ export function useSearch() {
   }, [pollStatus, pollResults, clearPolling]);
 
   const startSearch = async (niche: string, locationOrSource: string) => {
+    if (isStartingRef.current) return;
     try {
+      isStartingRef.current = true;
       setIsStarting(true);
+      setError(null);
       clearPolling();
       resultsPageRef.current = 1;
-      retryCountRef.current = 0;
+      statusRetryRef.current = 0;
+      resultsRetryRef.current = 0;
 
-      // Detect if this is a LinkedIn search (no location, source="linkedin")
       const isLinkedIn = locationOrSource === 'linkedin';
       const payload = isLinkedIn
-        ? { niche, location: '', source: 'linkedin' }
-        : { niche, location: locationOrSource, source: 'google_maps' };
+        ? { niche, location: '', source: 'linkedin' as const }
+        : { niche, location: locationOrSource, source: 'google_maps' as const };
 
       const { data } = await api.post(API_ROUTES.searches.create, payload);
       setActiveSearch(data.id);
@@ -129,10 +159,13 @@ export function useSearch() {
       return data;
     } catch (error: any) {
       const detail = error.response?.data?.detail;
-      showToast(typeof detail === 'string' ? detail : detail?.message || 'Failed to start search', 'error');
+      const msg = typeof detail === 'string' ? detail : detail?.message || 'Failed to start search';
+      setError(msg);
+      showToast(msg, 'error');
       throw error;
     } finally {
       setIsStarting(false);
+      isStartingRef.current = false;
     }
   };
 
@@ -155,10 +188,13 @@ export function useSearch() {
   const fetchHistory = async () => {
     try {
       setIsFetchingHistory(true);
+      setError(null);
       const { data } = await api.get(API_ROUTES.searches.list);
       setHistory(data.items || []);
     } catch (error) {
-      showToast('Failed to load search history', 'error');
+      const msg = 'Failed to load search history';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsFetchingHistory(false);
     }
@@ -168,7 +204,8 @@ export function useSearch() {
     if (activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '')) {
       clearPolling();
       resultsPageRef.current = 1;
-      retryCountRef.current = 0;
+      statusRetryRef.current = 0;
+      resultsRetryRef.current = 0;
       pollStatus(activeSearchId);
       pollResults(activeSearchId);
     }
@@ -182,6 +219,7 @@ export function useSearch() {
     isStarting,
     isCancelling,
     isFetchingHistory,
+    error,
     startSearch,
     cancelSearch,
     fetchHistory,

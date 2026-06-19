@@ -14,10 +14,10 @@ function ParticleField() {
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const palette = [
-      new THREE.Color('#00f0ff'),
-      new THREE.Color('#7c3aed'),
-      new THREE.Color('#ec4899'),
-      new THREE.Color('#3b82c4'),
+      new THREE.Color('#06B6D4'),
+      new THREE.Color('#4F46E5'),
+      new THREE.Color('#10B981'),
+      new THREE.Color('#6366F1'),
     ];
     for (let i = 0; i < count; i++) {
       const radius = 5 + Math.random() * 15;
@@ -75,11 +75,11 @@ function Globe() {
     <group>
       <mesh ref={ref}>
         <icosahedronGeometry args={[2.2, 4]} />
-        <meshBasicMaterial color="#00f0ff" wireframe transparent opacity={0.08} />
+        <meshBasicMaterial color="#4F46E5" wireframe transparent opacity={0.08} />
       </mesh>
       <mesh ref={wireRef}>
         <icosahedronGeometry args={[2.2, 1]} />
-        <meshBasicMaterial color="#7c3aed" wireframe transparent opacity={0.15} />
+        <meshBasicMaterial color="#06B6D4" wireframe transparent opacity={0.15} />
       </mesh>
     </group>
   );
@@ -124,9 +124,9 @@ function Scene() {
     <>
       <ParticleField />
       <Globe />
-      <OrbitingRing radius={3.5} color="#00f0ff" speed={0.02} />
-      <OrbitingRing radius={4.2} color="#7c3aed" speed={-0.015} tilt={Math.PI * 0.4} />
-      <OrbitingRing radius={5.0} color="#ec4899" speed={0.01} tilt={Math.PI * 0.6} />
+      <OrbitingRing radius={3.5} color="#06B6D4" speed={0.02} />
+      <OrbitingRing radius={4.2} color="#4F46E5" speed={-0.015} tilt={Math.PI * 0.4} />
+      <OrbitingRing radius={5.0} color="#10B981" speed={0.01} tilt={Math.PI * 0.6} />
     </>
   );
 }

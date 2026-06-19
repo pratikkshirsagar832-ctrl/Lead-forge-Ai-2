@@ -9,11 +9,13 @@ export function useLeads() {
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
 
   const fetchLeads = useCallback(async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
       if (filters.searchId) params.append('search_id', filters.searchId);
@@ -26,7 +28,9 @@ export function useLeads() {
       const { data } = await api.get(`${API_ROUTES.leads.list}?${params.toString()}`);
       setLeads(data.items, data.total);
     } catch (error) {
-      showToast('Failed to load leads', 'error');
+      const msg = 'Failed to load leads';
+      setError(msg);
+      showToast(msg, 'error');
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -34,16 +38,15 @@ export function useLeads() {
   }, [filters, setLeads, showToast]);
 
   const updateLeadStatus = async (id: string, status: string) => {
+    const prevStatus = leads.find(l => l.id === id)?.user_status;
     try {
       setIsUpdating((prev) => ({ ...prev, [id]: true }));
-      // Optimistic update
       updateLeadInStore(id, { user_status: status });
       const { data } = await api.patch(API_ROUTES.leads.status(id), { user_status: status });
       updateLeadInStore(id, { user_status: data.user_status });
       showToast('Status updated', 'success');
     } catch (error) {
-      // Revert optimism if needed (complex, but simple fetch works too)
-      fetchLeads();
+      if (prevStatus) updateLeadInStore(id, { user_status: prevStatus });
       showToast('Failed to update status', 'error');
     } finally {
       setIsUpdating((prev) => ({ ...prev, [id]: false }));
@@ -51,12 +54,14 @@ export function useLeads() {
   };
 
   const updateLeadNotes = async (id: string, notes: string) => {
+    const prevNotes = leads.find(l => l.id === id)?.user_notes;
     try {
       setIsUpdating((prev) => ({ ...prev, [`${id}_notes`]: true }));
       updateLeadInStore(id, { user_notes: notes });
       await api.patch(API_ROUTES.leads.notes(id), { user_notes: notes });
-      showToast('Notes saved', 'success', 2000);
+      showToast('Notes saved', 'success');
     } catch (error) {
+      if (prevNotes !== undefined) updateLeadInStore(id, { user_notes: prevNotes });
       showToast('Failed to save notes', 'error');
     } finally {
       setIsUpdating((prev) => ({ ...prev, [`${id}_notes`]: false }));
@@ -80,6 +85,7 @@ export function useLeads() {
   const exportCsv = async () => {
     try {
       setIsExporting(true);
+      setError(null);
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
       if (filters.searchId) params.append('search_id', filters.searchId);
@@ -91,7 +97,6 @@ export function useLeads() {
         responseType: 'blob',
       });
 
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement('a');
       a.href = url;
@@ -102,7 +107,9 @@ export function useLeads() {
       document.body.removeChild(a);
       showToast('Export successful', 'success');
     } catch (error) {
-      showToast('Failed to export CSV', 'error');
+      const msg = 'Failed to export CSV';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsExporting(false);
     }
@@ -115,6 +122,7 @@ export function useLeads() {
     isLoading,
     isExporting,
     isUpdating,
+    error,
     setFilters,
     fetchLeads,
     updateLeadStatus,

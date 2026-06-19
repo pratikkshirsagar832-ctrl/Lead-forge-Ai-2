@@ -1,20 +1,7 @@
 import { create } from 'zustand';
-import type { SearchStatus, SearchHistoryItem } from '@/lib/types';
+import type { SearchStatus, SearchHistoryItem, LeadListItem } from '@/lib/types';
 
-export interface SearchResult {
-  id: string;
-  business_name: string;
-  category: string | null;
-  full_address: string | null;
-  phone: string | null;
-  website_url: string | null;
-  rating: number | null;
-  total_reviews: number;
-  lead_category: string;
-  website_health_score: number | null;
-  user_status: string;
-  is_favorite: boolean;
-}
+export type SearchResult = LeadListItem;
 
 export interface SearchState {
   activeSearchId: string | null;
@@ -45,7 +32,7 @@ export const useSearchStore = create<SearchState>((set) => ({
       const unique = newResults.filter((r) => !existingIds.has(r.id));
       return {
         results: [...state.results, ...unique],
-        resultsTotal: state.resultsTotal + unique.length,
+        resultsTotal: state.results.length + unique.length,
       };
     }),
   setHistory: (history) => set({ history }),
