@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
 
-    gemini_api_key: str = ""
+    openai_api_key: str = ""
 
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""

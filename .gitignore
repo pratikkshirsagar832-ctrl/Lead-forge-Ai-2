@@ -37,3 +37,6 @@ backend/Scrapling/Website-analysis/
 
 # Docker
 deploy/nginx/hyperclients.conf
+
+# Old standalone LinkedIn scraper
+Linkdin_Scraper/

@@ -4,7 +4,7 @@ import Script from 'next/script';
 import '../styles/globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { ToastContainer } from '@/components/shared/Toast';
-import { AnimatedBackground } from '@/components/AnimatedBackground';
+import { ThreeBackground } from '@/components/shared/ThreeBackground';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-heading', weight: ['400', '500', '600', '700'] });
@@ -30,7 +30,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AnimatedBackground />
+          <ThreeBackground />
           {children}
           <ToastContainer />
         </ThemeProvider>

@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 
 class SearchCreateRequest(BaseModel):
     """Request body for creating a new search."""
-    niche: str = Field(..., min_length=1, max_length=200, description="Business niche to search")
-    location: str = Field(..., min_length=1, max_length=300, description="Geographic location")
+    niche: str = Field(..., min_length=1, max_length=200, description="Business niche or keyword to search")
+    location: str = Field("", max_length=300, description="Geographic location (only for google_maps)")
+    source: str = Field("google_maps", description="Source type: google_maps or linkedin")
 
 
 class SearchResponse(BaseModel):

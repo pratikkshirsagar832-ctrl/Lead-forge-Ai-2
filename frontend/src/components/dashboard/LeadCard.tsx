@@ -2,7 +2,7 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LEAD_CATEGORIES, USER_STATUSES } from '@/lib/constants';
 import { formatNumber, truncate } from '@/lib/utils';
-import { MapPin, Globe, Star, Phone, ChevronRight, Heart } from 'lucide-react';
+import { MapPin, Globe, Star, Phone, ChevronRight, Heart, Quote, ExternalLink, Users, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 import type { LeadListItem } from '@/lib/types';
@@ -14,6 +14,91 @@ interface LeadCardProps {
 }
 
 export function LeadCard({ lead, onToggleFavorite, isUpdatingFav }: LeadCardProps) {
+  const isLinkedIn = lead.source === 'linkedin';
+
+  if (isLinkedIn) {
+    const scorePercent = lead.intent_score != null ? Math.round(lead.intent_score * 100) : 0;
+    return (
+      <GlassCard hoverEffect className="flex flex-col group transition-all overflow-hidden relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-cyan/[0.02] to-transparent pointer-events-none" />
+        <div className="p-5 flex-1 cursor-default relative z-10">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-accent-cyan" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-offwhite truncate">{lead.author_name || 'LinkedIn User'}</p>
+                {lead.author_profile && (
+                  <a
+                    href={lead.author_profile}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[11px] text-ice/50 hover:text-accent-cyan truncate block transition-colors"
+                  >
+                    View Profile
+                  </a>
+                )}
+              </div>
+            </div>
+            {lead.intent_score != null && lead.intent_score >= 0.7 && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                <CheckCircle className="w-3 h-3 text-emerald-400" />
+                <span className="text-xs text-emerald-400 font-semibold">{scorePercent}%</span>
+              </div>
+            )}
+          </div>
+
+          {lead.post_text && (
+            <div className="mb-3">
+              <Quote className="w-3.5 h-3.5 text-ice/30 mb-1" />
+              <p className="text-sm text-ice/70 leading-relaxed line-clamp-4">
+                {lead.post_text}
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            {lead.post_url && (
+              <a
+                href={lead.post_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1.5 text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>View Post</span>
+              </a>
+            )}
+            {lead.intent_reason && (
+              <span className="text-[11px] text-ice/40 italic truncate ml-2">{lead.intent_reason}</span>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[10px] px-2 py-0.5 rounded bg-accent-cyan/10 text-accent-cyan font-semibold flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              LinkedIn
+            </span>
+            {lead.linkedin_keyword && (
+              <span className="text-[10px] text-ice/40">{lead.linkedin_keyword}</span>
+            )}
+          </div>
+        </div>
+
+        <Link
+          href={`/dashboard/leads/${lead.id}`}
+          className="relative z-10 px-5 py-3 border-t border-ocean/20 bg-navy/40 hover:bg-steel/10 flex items-center justify-between text-xs font-semibold text-steel hover:text-ice transition-all duration-300 group/link"
+        >
+          <span>View Lead</span>
+          <ChevronRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover/link:translate-x-1" />
+        </Link>
+      </GlassCard>
+    );
+  }
+
   const leadCatKey = lead.lead_category || 'warm';
   const categoryConfig = LEAD_CATEGORIES[leadCatKey as keyof typeof LEAD_CATEGORIES]
     || { label: leadCatKey, color: '#94a3b8', bg: '#f1f5f9' };

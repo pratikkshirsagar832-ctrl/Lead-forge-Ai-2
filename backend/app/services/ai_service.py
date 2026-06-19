@@ -1,72 +1,74 @@
 """
 Hyperclients — AI Pitch Service
 
-Generates professional outreach pitches using Gemini API.
+Generates professional outreach pitches using OpenAI.
 On-demand only — not called automatically during search pipeline.
 """
 
+import json
 import logging
 from typing import Any, Optional
 
-import httpx
+from openai import OpenAI
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
-GEMINI_MODEL = "gemini-2.0-flash-lite"
+PITCH_MODEL = "gpt-4o-mini"
+MESSAGE_MODEL = "gpt-4o-mini"
+
+
+def _get_openai_client() -> OpenAI | None:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return None
+    return OpenAI(api_key=settings.openai_api_key)
 
 
 async def generate_pitch(
     lead: dict[str, Any],
     analysis: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    settings = get_settings()
-
-    if not settings.gemini_api_key:
+    client = _get_openai_client()
+    if not client:
         return {
-            "pitch": "AI pitch generation is not configured. Please set GEMINI_API_KEY.",
+            "pitch": "AI pitch generation is not configured. Please set OPENAI_API_KEY.",
             "confidence_score": 0.0,
             "estimated_deal_value": 0.0,
         }
 
-    prompt = _build_prompt(lead, analysis)
+    prompt = _build_pitch_prompt(lead, analysis)
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent",
-                params={"key": settings.gemini_api_key},
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [{"text": prompt}],
-                        }
-                    ],
-                    "systemInstruction": {
-                        "parts": [{
-                            "text": (
-                                "You are a professional sales copywriter helping freelance web developers "
-                                "and digital marketing agencies write outreach messages. "
-                                "Write concise, professional, and personalized outreach pitches. "
-                                "Do NOT sound robotic or generic. Use the business details provided. "
-                                "Keep it under 200 words. Include a clear value proposition and call to action."
-                            )
-                        }]
+        import asyncio
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None,
+            lambda: client.chat.completions.create(
+                model=PITCH_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a professional sales copywriter helping freelance web developers "
+                            "and digital marketing agencies write outreach messages. "
+                            "Write concise, professional, and personalized outreach pitches. "
+                            "Do NOT sound robotic or generic. Use the business details provided. "
+                            "Keep it under 200 words. Include a clear value proposition and call to action."
+                            "\n\nReturn a JSON object with key 'pitch' containing the outreach text."
+                        ),
                     },
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 500,
-                    },
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7,
+                max_tokens=500,
+            ),
+        )
+        result = json.loads(resp.choices[0].message.content)
+        pitch_text = result.get("pitch", "")
 
-        pitch_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         confidence = _calculate_confidence(lead, analysis)
         deal_value = _estimate_deal_value(lead, analysis)
 
@@ -76,13 +78,6 @@ async def generate_pitch(
             "estimated_deal_value": deal_value,
         }
 
-    except httpx.TimeoutException:
-        logger.error("Gemini API timeout")
-        return {
-            "pitch": "Pitch generation timed out. Please try again.",
-            "confidence_score": 0.0,
-            "estimated_deal_value": 0.0,
-        }
     except Exception as e:
         logger.error(f"Pitch generation failed: {e}")
         return {
@@ -92,9 +87,64 @@ async def generate_pitch(
         }
 
 
-def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
+async def generate_website_message(
+    lead: dict[str, Any],
+    analysis: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    client = _get_openai_client()
+    if not client:
+        return {
+            "message": (
+                f"Hi {lead.get('business_name', 'there')}! "
+                f"I noticed your website could use some improvements. "
+                f"Would you be open to a quick chat about how I can help?"
+            ),
+        }
+
+    prompt = _build_message_prompt(lead, analysis)
+
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None,
+            lambda: client.chat.completions.create(
+                model=MESSAGE_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a professional web consultant reaching out to business owners. "
+                            "Write a short, personalized outreach message that mentions specific issues "
+                            "found on their website. Keep it under 120 words. Friendly but professional. "
+                            "Include a clear call to action. Do NOT use markdown. Do NOT use emojis. "
+                            "Write in plain text suitable for WhatsApp."
+                            "\n\nReturn a JSON object with key 'message' containing the outreach text."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7,
+                max_tokens=300,
+            ),
+        )
+        result = json.loads(resp.choices[0].message.content)
+        return {"message": result.get("message", "")}
+
+    except Exception as e:
+        logger.error(f"Website message generation failed: {e}")
+        return {
+            "message": (
+                f"Hi {lead.get('business_name', 'there')}! "
+                f"I can help improve your online presence. "
+                f"Would you be open to a quick conversation?"
+            ),
+        }
+
+
+def _build_pitch_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
     parts = [
-        "Write a professional outreach pitch for this business:\n",
         f"Business Name: {lead.get('business_name', 'Unknown')}",
         f"Category: {lead.get('category', 'N/A')}",
     ]
@@ -127,9 +177,56 @@ def _build_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
         "\nWrite a concise, professional pitch that:"
         "\n- Acknowledges their business specifically"
         "\n- Mentions specific website issues or opportunities if available"
-        "\n- Offers a clear value proposition (web development, redesign, or digital marketing)"
+        "\n- Offers a clear value proposition"
         "\n- Has a friendly but professional call to action"
         "\n- Is suitable for email or LinkedIn outreach"
+    )
+
+    return "\n".join(parts)
+
+
+def _build_message_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
+    parts = [
+        f"Business Name: {lead.get('business_name', 'Unknown')}",
+        f"Category: {lead.get('category', 'N/A')}",
+    ]
+
+    if lead.get("full_address"):
+        parts.append(f"Location: {lead['full_address']}")
+
+    if lead.get("website_url"):
+        parts.append(f"Website: {lead['website_url']}")
+    else:
+        parts.append("Website: No website found — they need one built")
+
+    if lead.get("phone"):
+        parts.append(f"Phone: {lead['phone']}")
+
+    if analysis:
+        score = analysis.get("overall_score", 0)
+        parts.append(f"Website Health Score: {score}/100")
+        issues = analysis.get("issues", [])
+        if issues:
+            parts.append("Website Issues Found:")
+            for issue in issues[:4]:
+                parts.append(f"  - {issue}")
+        raw = analysis.get("raw_analysis", {})
+        breakdown = raw.get("score_breakdown", {})
+        if breakdown:
+            deductions = breakdown.get("deductions", [])
+            criticals = [d for d in deductions if d.get("severity") == "critical"]
+            if criticals:
+                parts.append("Critical Issues:")
+                for c in criticals[:3]:
+                    parts.append(f"  - {c.get('reason', '')}")
+
+    parts.append(
+        "\nWrite a short outreach message that:"
+        "\n- Greets them by business name"
+        "\n- Mentions 1-2 specific issues found on their website"
+        "\n- Offers your help in a friendly, non-pushy way"
+        "\n- Has a clear call to action (reply or call)"
+        "\n- Is under 120 words, plain text, no markdown, no emojis"
     )
 
     return "\n".join(parts)
@@ -177,124 +274,3 @@ def _estimate_deal_value(lead: dict, analysis: Optional[dict] = None) -> float:
     elif reviews > 20:
         base_value *= 1.1
     return round(base_value, 2)
-
-
-async def generate_website_message(
-    lead: dict[str, Any],
-    analysis: Optional[dict[str, Any]] = None,
-) -> dict[str, Any]:
-    settings = get_settings()
-
-    if not settings.gemini_api_key:
-        return {
-            "message": (
-                f"Hi {lead.get('business_name', 'there')}! "
-                f"I noticed your website could use some improvements. "
-                f"Would you be open to a quick chat about how I can help?"
-            ),
-        }
-
-    prompt = _build_website_message_prompt(lead, analysis)
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent",
-                params={"key": settings.gemini_api_key},
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [{"text": prompt}],
-                        }
-                    ],
-                    "systemInstruction": {
-                        "parts": [{
-                            "text": (
-                                "You are a professional web consultant reaching out to business owners. "
-                                "Write a short, personalized WhatsApp message that mentions specific issues "
-                                "found on their website. Keep it under 120 words. Friendly but professional. "
-                                "Include a clear call to action. Do NOT use markdown. Do NOT use emojis. "
-                                "Write in plain text suitable for WhatsApp."
-                            )
-                        }]
-                    },
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 300,
-                    },
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-
-        message_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        return {"message": message_text}
-
-    except httpx.TimeoutException:
-        logger.error("Gemini API timeout for website message")
-        return {
-            "message": (
-                f"Hi {lead.get('business_name', 'there')}! "
-                f"I recently reviewed your website and noticed a few areas "
-                f"that could be improved. Would you be open to a quick chat?"
-            ),
-        }
-    except Exception as e:
-        logger.error(f"Website message generation failed: {e}")
-        return {
-            "message": (
-                f"Hi {lead.get('business_name', 'there')}! "
-                f"I can help improve your online presence. "
-                f"Would you be open to a quick conversation?"
-            ),
-        }
-
-
-def _build_website_message_prompt(lead: dict, analysis: Optional[dict] = None) -> str:
-    parts = [
-        "Write a short WhatsApp outreach message for this business:\n",
-        f"Business Name: {lead.get('business_name', 'Unknown')}",
-        f"Category: {lead.get('category', 'N/A')}",
-    ]
-
-    if lead.get("full_address"):
-        parts.append(f"Location: {lead['full_address']}")
-
-    if lead.get("website_url"):
-        parts.append(f"Website: {lead['website_url']}")
-    else:
-        parts.append("Website: No website found — they need one built")
-
-    if lead.get("phone"):
-        parts.append(f"Phone: {lead['phone']}")
-
-    if analysis:
-        score = analysis.get("overall_score", 0)
-        parts.append(f"Website Health Score: {score}/100")
-        issues = analysis.get("issues", [])
-        if issues:
-            parts.append("Website Issues Found:")
-            for issue in issues[:4]:
-                parts.append(f"  - {issue}")
-        raw = analysis.get("raw_analysis", {})
-        breakdown = raw.get("score_breakdown", {})
-        if breakdown:
-            deductions = breakdown.get("deductions", [])
-            criticals = [d for d in deductions if d.get("severity") == "critical"]
-            if criticals:
-                parts.append("Critical Issues:")
-                for c in criticals[:3]:
-                    parts.append(f"  - {c.get('reason', '')}")
-
-    parts.append(
-        "\nWrite a short WhatsApp message that:"
-        "\n- Greets them by business name"
-        "\n- Mentions 1-2 specific issues found on their website"
-        "\n- Offers your help in a friendly, non-pushy way"
-        "\n- Has a clear call to action (reply or call)"
-        "\n- Is under 120 words, plain text, no markdown, no emojis"
-    )
-
-    return "\n".join(parts)

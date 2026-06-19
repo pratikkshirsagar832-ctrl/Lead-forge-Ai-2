@@ -36,6 +36,11 @@
   --color-sapphire: #1E3A6B;
   --color-platinum: #E2E8F0;
 
+  /* LinkedIn-Inspired Accents */
+  --color-accent-cyan: #00f0ff;
+  --color-accent-purple: #7c3aed;
+  --color-accent-pink: #ec4899;
+
   /* ── ANIMATION KEYFRAMES ── */
 
   --animate-glow: glow 4s ease-in-out infinite alternate;
@@ -277,6 +282,47 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(237, 242, 250, 0.05);
 }
 
+.glass {
+  background: rgba(20, 20, 32, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-light {
+  background: rgba(28, 28, 46, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.3), rgba(124, 58, 237, 0.3));
+  z-index: -1;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  padding: 1px;
+}
+
+.text-gradient-cyan {
+  background: linear-gradient(135deg, #00f0ff, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.neon-glow {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.15), 0 0 40px rgba(124, 58, 237, 0.1);
+}
+
 .shimmer-overlay {
   background: linear-gradient(
     90deg,
@@ -288,7 +334,18 @@ h1, h2, h3, h4, h5, h6 {
   animation: shimmer 2.5s ease-in-out infinite;
 }
 
-/* ── PREMIUM UTILITY CLASSES ── */
+  @keyframes neonPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(0, 240, 255, 0.1); }
+    50% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.25); }
+  }
+
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ── PREMIUM UTILITY CLASSES ── */
 
 .animate-delay-100 { animation-delay: 0.1s; }
 .animate-delay-200 { animation-delay: 0.2s; }

@@ -43,18 +43,23 @@ async def create_search(
     """Create a new search and start the background pipeline."""
     supabase = get_supabase_admin()
     user_id = current_user["id"]
+    source = request.source
+
+    # For LinkedIn searches, location is not needed — use keyword directly
+    query_term = request.niche.strip()
+    location_term = request.location.strip() if source == "google_maps" else "linkedin"
 
     search_data = {
         "user_id": user_id,
-        "niche": request.niche.strip(),
-        "location": request.location.strip(),
+        "niche": query_term,
+        "location": location_term,
+        "source": source,
         "status": "queued",
         "progress_percent": 0,
         "message": "Search queued",
     }
 
     # Increment usage synchronously BEFORE creating search
-    # This prevents race conditions (limit check → usage increment gap)
     try:
         supabase.rpc("increment_daily_usage", {
             "p_user_id": user_id,
@@ -63,7 +68,6 @@ async def create_search(
         }).execute()
     except Exception as e:
         logger.warning(f"Failed to increment daily usage via RPC: {e}")
-        # Fallback: upsert directly
         try:
             today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             existing = supabase.table("daily_usage").select("id, searches_run").eq("user_id", user_id).eq("date", today_str).execute()
@@ -96,8 +100,9 @@ async def create_search(
         run_search_pipeline,
         search_id=search["id"],
         user_id=user_id,
-        niche=request.niche.strip(),
-        location=request.location.strip(),
+        niche=query_term,
+        location=location_term,
+        source=source,
     )
 
     return search
@@ -226,7 +231,7 @@ async def get_search_results(
 
         response = (
             supabase.table("leads")
-            .select("id, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite")
+            .select("id, source, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite, author_name, author_profile, post_text, post_url, intent_score, intent_reason, linkedin_keyword")
             .eq("search_id", search_id)
             .eq("user_id", current_user["id"])
             .order("created_at", desc=False)

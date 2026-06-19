@@ -106,13 +106,20 @@ export function useSearch() {
     };
   }, [pollStatus, pollResults, clearPolling]);
 
-  const startSearch = async (niche: string, location: string) => {
+  const startSearch = async (niche: string, locationOrSource: string) => {
     try {
       setIsStarting(true);
       clearPolling();
       resultsPageRef.current = 1;
       retryCountRef.current = 0;
-      const { data } = await api.post(API_ROUTES.searches.create, { niche, location });
+
+      // Detect if this is a LinkedIn search (no location, source="linkedin")
+      const isLinkedIn = locationOrSource === 'linkedin';
+      const payload = isLinkedIn
+        ? { niche, location: '', source: 'linkedin' }
+        : { niche, location: locationOrSource, source: 'google_maps' };
+
+      const { data } = await api.post(API_ROUTES.searches.create, payload);
       setActiveSearch(data.id);
       setProgress({ status: 'queued', elapsed_seconds: 0 });
       showToast('Search started successfully', 'success');

@@ -55,6 +55,9 @@ RUN python -m playwright install chromium --with-deps 2>/dev/null || true
 COPY --from=go-builder /google-maps-scraper /app/google-maps-scraper/google-maps-scraper
 RUN chmod +x /app/google-maps-scraper/google-maps-scraper
 
+# Create sessions directory for LinkedIn cookies
+RUN mkdir -p /app/sessions
+
 # Copy application code
 COPY app/ /app/app/
 

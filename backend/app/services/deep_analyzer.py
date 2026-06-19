@@ -1,30 +1,20 @@
 """
-Hyperclients — Gemini Deep Website Analyzer
+Hyperclients — Deep Website Analyzer
 
-Takes batch of Scrapling-extracted site data, sends to Gemini 2.5 Flash-Lite,
+Takes batch of Scrapling-extracted site data, sends to OpenAI,
 and returns deep analysis: content quality, SEO depth, UX issues, broken elements.
-
-System prompt encodes knowledge from:
-  - SEO-audit skill (technical SEO, content quality, international SEO)
-  - AI-SEO skill (AI visibility, content extractability, agentic readiness)
-  - Analytics skill (tracking, cookie consent, measurement)
-  - Copywriting skill (content quality, CTA effectiveness, messaging)
-  - Prospecting skill (lead qualification, website classification)
-
-Performance: batches 5 sites per request. Only called for non-trivial sites (score >= 20).
 """
 
 import json
 import logging
 import re
-import httpx
+
+from openai import OpenAI
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
-GEMINI_MODEL = "gemini-2.5-flash-lite"
 BATCH_SIZE = 5
 
 SYSTEM_PROMPT = """You are a senior website quality auditor and SEO specialist. Your job is to analyze website data extracted from live pages and provide deep, actionable assessments.
@@ -95,19 +85,24 @@ Scoring for recommended_category:
 Be strict but fair. A small local business site should be judged against reasonable expectations for its type, not against Fortune 500 standards."""  # noqa: E501
 
 
-async def batch_deep_analyze(
-    sites_data: list[dict],
-) -> list[dict]:
+def _get_openai_client() -> OpenAI | None:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return None
+    return OpenAI(api_key=settings.openai_api_key)
+
+
+async def batch_deep_analyze(sites_data: list[dict]) -> list[dict]:
     """
-    Take a batch of Scrapling analysis results and run Gemini deep analysis.
+    Take a batch of Scrapling analysis results and run deep analysis via OpenAI.
     Returns enhanced results with AI-assessed scores and findings.
     """
     if not sites_data:
         return []
 
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        logger.warning("Gemini API key not set — skipping deep analysis")
+    client = _get_openai_client()
+    if not client:
+        logger.warning("OpenAI API key not set — skipping deep analysis")
         return sites_data
 
     all_enhanced: list[dict] = []
@@ -115,21 +110,17 @@ async def batch_deep_analyze(
     for i in range(0, len(sites_data), BATCH_SIZE):
         batch = sites_data[i : i + BATCH_SIZE]
         try:
-            enhanced = await _call_gemini_batch(batch)
+            enhanced = await _call_openai_batch(client, batch)
             all_enhanced.extend(enhanced)
         except Exception as e:
-            logger.error(f"Gemini batch analysis failed for batch {i // BATCH_SIZE}: {e}")
-            # Fallback: return original data unchanged
+            logger.error(f"Deep analysis batch {i // BATCH_SIZE} failed: {e}")
             all_enhanced.extend(batch)
 
     return all_enhanced
 
 
-async def _call_gemini_batch(batch: list[dict]) -> list[dict]:
-    """Send a batch of site data to Gemini and parse the response."""
-    settings = get_settings()
-
-    # Build the batch prompt
+async def _call_openai_batch(client: OpenAI, batch: list[dict]) -> list[dict]:
+    """Send a batch of site data to OpenAI and parse the response."""
     sites_json = []
     for site in batch:
         raw = site.get("raw_analysis", {})
@@ -168,81 +159,65 @@ async def _call_gemini_batch(batch: list[dict]) -> list[dict]:
         f"WEBSITES DATA:\n{json.dumps(sites_json, indent=2)}"
     )
 
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent",
-                params={"key": settings.gemini_api_key},
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [{"text": user_prompt}],
-                        }
-                    ],
-                    "systemInstruction": {
-                        "parts": [{"text": SYSTEM_PROMPT}],
-                    },
-                    "generationConfig": {
-                        "temperature": 0.3,
-                        "maxOutputTokens": 4096,
-                    },
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
+    import asyncio
+    loop = asyncio.get_event_loop()
 
-        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        # Extract JSON array from response (handle markdown code blocks)
-        json_str = _extract_json(text)
-        gemini_results: list[dict] = json.loads(json_str)
+    resp = await loop.run_in_executor(
+        None,
+        lambda: client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=4096,
+        ),
+    )
 
-        # Merge Gemini results back into original site data
-        merged = []
-        for site, gemini in zip(batch, gemini_results):
-            enhanced = dict(site)
-            enhanced["gemini_analysis"] = gemini
-            enhanced["gemini_score"] = gemini.get("total_score", 50)
+    text = resp.choices[0].message.content
+    json_str = _extract_json(text)
+    ai_results: list[dict] = json.loads(json_str)
 
-            # Blend Scrapling + Gemini scores (weighted: 40% scrapling, 60% gemini)
-            scrapling_score = site.get("overall_score", 50)
-            gemini_score = gemini.get("total_score", 50)
-            blended = int(round(scrapling_score * 0.4 + gemini_score * 0.6))
-            enhanced["overall_score"] = max(0, min(100, blended))
+    # Ensure we always have a list
+    if isinstance(ai_results, dict):
+        ai_results = [ai_results]
 
-            # Use Gemini's category recommendation if available
-            gemini_cat = gemini.get("recommended_category", "")
-            if gemini_cat in ("hot", "warm", "skip"):
-                enhanced["category"] = gemini_cat
-            else:
-                enhanced["category"] = _categorize(enhanced["overall_score"])
+    merged = []
+    for site, ai_result in zip(batch, ai_results):
+        enhanced = dict(site)
+        enhanced["ai_analysis"] = ai_result
+        enhanced["ai_score"] = ai_result.get("total_score", 50)
 
-            # Merge issues: start with Scrapling issues, add Gemini issues
-            all_issues = list(site.get("issues", []))
-            for key in ("technical_issues_found", "ux_issues_found", "trust_issues_found", "missing_features"):
-                for issue in gemini.get(key, []):
-                    if issue and issue not in all_issues:
-                        all_issues.append(issue)
-            enhanced["issues"] = all_issues
+        scrapling_score = site.get("overall_score", 50)
+        ai_score = ai_result.get("total_score", 50)
+        blended = int(round(scrapling_score * 0.4 + ai_score * 0.6))
+        enhanced["overall_score"] = max(0, min(100, blended))
 
-            merged.append(enhanced)
+        ai_cat = ai_result.get("recommended_category", "")
+        if ai_cat in ("hot", "warm", "skip"):
+            enhanced["category"] = ai_cat
+        else:
+            enhanced["category"] = _categorize(enhanced["overall_score"])
 
-        return merged
+        all_issues = list(site.get("issues", []))
+        for key in ("technical_issues_found", "ux_issues_found", "trust_issues_found", "missing_features"):
+            for issue in ai_result.get(key, []):
+                if issue and issue not in all_issues:
+                    all_issues.append(issue)
+        enhanced["issues"] = all_issues
 
-    except (json.JSONDecodeError, KeyError, IndexError, httpx.HTTPError) as e:
-        logger.error(f"Gemini batch parse/request error: {e}")
-        raise
+        merged.append(enhanced)
+
+    return merged
 
 
 def _extract_json(text: str) -> str:
-    """Extract JSON array from text that may contain markdown code blocks.
-    Handles nested brackets correctly (unlike naive regex).
-    """
+    """Extract JSON array from text that may contain markdown code blocks."""
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if m:
         text = m.group(1).strip()
-
     depth = 0
     start = -1
     for i, ch in enumerate(text):
@@ -263,6 +238,3 @@ def _categorize(score: int) -> str:
     elif score <= 69:
         return "warm"
     return "skip"
-
-
-

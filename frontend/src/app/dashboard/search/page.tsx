@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,19 +11,99 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
-import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle } from 'lucide-react';
+import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, CheckCircle, TrendingUp, Hash, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { LEAD_CATEGORIES } from '@/lib/constants';
 
-const searchSchema = z.object({
+type SearchSource = 'google_maps' | 'linkedin';
+
+const mapsSchema = z.object({
   niche: z.string().min(2, 'Niche must be at least 2 characters'),
   location: z.string().min(2, 'Location must be at least 2 characters'),
 });
 
-type SearchSchema = z.infer<typeof searchSchema>;
+const linkedinSchema = z.object({
+  keyword: z.string().min(2, 'Keyword must be at least 2 characters'),
+});
+
+type LinkedInLeadType = 'all' | 'intern' | 'agency' | 'company' | 'one_client';
+type LinkedInTimeFilter = 'latest' | '7_days' | '14_days' | '27_days' | '2_months';
+
+const LINKEDIN_TIME_OPTIONS: { label: string; value: LinkedInTimeFilter }[] = [
+  { label: 'Latest', value: 'latest' },
+  { label: '7 Days', value: '7_days' },
+  { label: '14 Days', value: '14_days' },
+  { label: '27 Days', value: '27_days' },
+  { label: '2 Months', value: '2_months' },
+];
+
+const LEAD_TYPE_OPTIONS: { label: string; value: LinkedInLeadType; desc: string }[] = [
+  { label: 'All', value: 'all', desc: 'Any buying intent' },
+  { label: 'Intern', value: 'intern', desc: 'Internship / entry-level' },
+  { label: 'Agency', value: 'agency', desc: 'Looking for agency' },
+  { label: 'Company', value: 'company', desc: 'Full-time hiring' },
+  { label: 'One Client', value: 'one_client', desc: 'One-time project' },
+];
 
 function LiveResultCard({ lead, index }: { lead: any; index: number }) {
+  const isLinkedIn = lead.source === 'linkedin';
+
+  if (isLinkedIn) {
+    const scorePercent = lead.intent_score != null ? Math.round(lead.intent_score * 100) : 0;
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, delay: index * 0.08, ease: 'easeOut' }}
+      >
+        <Link href={`/dashboard/leads/${lead.id}`} className="block group">
+          <div className="relative glass-light rounded-xl border border-white/5 hover:border-accent-cyan/20 transition-all duration-300 overflow-hidden hover:shadow-lg hover:shadow-accent-cyan/5 hover:-translate-y-0.5">
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0">
+                    <Users className="w-4 h-4 text-accent-cyan" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-offwhite truncate">{lead.author_name || 'LinkedIn User'}</p>
+                  </div>
+                </div>
+                {lead.intent_score >= 0.7 && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 font-semibold shrink-0">
+                    <CheckCircle className="w-3 h-3" />
+                    {scorePercent}%
+                  </span>
+                )}
+              </div>
+              {lead.post_text && (
+                <p className="text-xs text-ice/70 leading-relaxed line-clamp-3 mb-3">
+                  <Quote className="w-3 h-3 text-ice/30 inline-block mr-1" />
+                  {lead.post_text}
+                </p>
+              )}
+              <div className="flex items-center gap-2 text-[11px] text-ice/40">
+                {lead.post_url && (
+                  <span className="flex items-center gap-1 text-ice/50">
+                    <ExternalLink className="w-3 h-3" />
+                    View Post
+                  </span>
+                )}
+                {lead.intent_reason && (
+                  <span className="truncate italic">{lead.intent_reason}</span>
+                )}
+              </div>
+            </div>
+            <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[10px] font-semibold text-steel group-hover:text-ice transition-colors">
+              <span>View Lead</span>
+              <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+    );
+  }
+
   const catKey = lead.lead_category || 'warm';
   const catCfg = LEAD_CATEGORIES[catKey as keyof typeof LEAD_CATEGORIES] || { label: catKey, color: '#94a3b8', bg: '#f1f5f9' };
 
@@ -107,27 +187,66 @@ export default function SearchPage() {
     startSearch,
     cancelSearch,
     resumePollingIfActive,
-    clearActiveSearch
+    clearActiveSearch,
   } = useSearch();
 
-  const { register, handleSubmit, formState: { errors } } = useForm<SearchSchema>({
-    resolver: zodResolver(searchSchema),
-  });
-
+  const [source, setSource] = useState<SearchSource>('google_maps');
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [linkedinKeyword, setLinkedinKeyword] = useState('');
+  const [linkedinTimeFilter, setLinkedinTimeFilter] = useState<LinkedInTimeFilter>('latest');
+  const [linkedinLeadType, setLinkedinLeadType] = useState<LinkedInLeadType>('all');
+  const [linkedinSessionOk, setLinkedinSessionOk] = useState<boolean | null>(null);
+  const [linkedinCookieJson, setLinkedinCookieJson] = useState('');
+  const [linkedinImporting, setLinkedinImporting] = useState(false);
+  const [linkedinImportError, setLinkedinImportError] = useState('');
+
+  const mapsForm = useForm({ resolver: zodResolver(mapsSchema) });
 
   useEffect(() => {
     resumePollingIfActive();
-    api.get('/api/auth/me').then(r => setSubscription(r.data?.subscription)).catch(e => console.error('Failed to fetch subscription:', e));
+    api.get('/api/auth/me').then(r => setSubscription(r.data?.subscription)).catch(() => {});
   }, [resumePollingIfActive]);
+
+  useEffect(() => {
+    if (source === 'linkedin') {
+      api.get('/api/linkedin/session/status')
+        .then(r => setLinkedinSessionOk(r.data?.logged_in ?? false))
+        .catch(() => setLinkedinSessionOk(false));
+    }
+  }, [source]);
 
   const remaining = subscription?.remaining_searches ?? 1;
   const searchesPerDay = subscription?.searches_per_day ?? 1;
   const isAtLimit = remaining <= 0;
 
-  const onSubmit = async (data: SearchSchema) => {
+  const handleImportCookies = useCallback(async () => {
+    setLinkedinImporting(true);
+    setLinkedinImportError('');
+    try {
+      const parsed = JSON.parse(linkedinCookieJson);
+      const cookies = Array.isArray(parsed) ? parsed : parsed.cookies || [];
+      const res = await api.post('/api/linkedin/session/import-cookies', { cookies });
+      if (res.data?.success) {
+        setLinkedinSessionOk(true);
+        setLinkedinCookieJson('');
+      } else {
+        setLinkedinImportError(res.data?.message || 'Import failed');
+      }
+    } catch (e: any) {
+      setLinkedinImportError('Invalid JSON: ' + e.message);
+    } finally {
+      setLinkedinImporting(false);
+    }
+  }, [linkedinCookieJson]);
+
+  const onSubmitMaps = async (data: { niche: string; location: string }) => {
     if (isAtLimit) return;
     await startSearch(data.niche, data.location);
+  };
+
+  const onSubmitLinkedin = async () => {
+    if (isAtLimit || !linkedinKeyword.trim()) return;
+    await startSearch(linkedinKeyword.trim(), 'linkedin');
   };
 
   const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
@@ -137,11 +256,10 @@ export default function SearchPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-offwhite tracking-tight">New Search</h1>
-          <p className="text-ice/60 mt-2">Find and qualify leads instantly from Google Maps.</p>
+          <p className="text-ice/60 mt-2">Find and qualify leads from multiple sources.</p>
         </div>
         {activeSearchId && (
-          <button
-            onClick={() => { clearActiveSearch(); }}
+          <button onClick={() => { clearActiveSearch(); }}
             className="inline-flex items-center gap-2 px-5 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all text-sm"
           >
             New Search
@@ -149,92 +267,182 @@ export default function SearchPage() {
         )}
       </div>
 
+      {/* Source selector */}
+      {!isSearchActive && !progress && (
+        <div className="flex gap-1.5 bg-navy/60 p-1 rounded-xl border border-ocean/30 w-fit">
+          <button
+            onClick={() => setSource('google_maps')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              source === 'google_maps' ? 'bg-steel/20 text-offwhite shadow-sm' : 'text-ice/50 hover:text-ice/80'
+            }`}
+          >
+            <MapPin className="w-4 h-4" />
+            Google Maps
+          </button>
+          <button
+            onClick={() => setSource('linkedin')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              source === 'linkedin' ? 'bg-accent-cyan/15 text-offwhite shadow-sm border border-accent-cyan/20' : 'text-ice/50 hover:text-ice/80'
+            }`}
+          >
+            <Linkedin className="w-4 h-4" />
+            LinkedIn
+          </button>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
         {!isSearchActive && !progress ? (
           <motion.div
-            key="form"
+            key={source}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
           >
-            <GlassCard className="p-8 max-w-3xl mx-auto border-ocean/40 bg-gradient-to-br from-ocean/30 to-navy">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-ice/80 mb-2">
-                      Target Niche
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Briefcase className="h-5 w-5 text-steel" />
-                      </div>
-                      <input
-                        {...register('niche')}
-                        type="text"
-                        placeholder="e.g. Plumbers, Dentists"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
-                      />
-                    </div>
-                    {errors.niche && <p className="text-red-400 text-sm mt-1.5">{errors.niche.message}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-ice/80 mb-2">
-                      Location
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <MapPin className="h-5 w-5 text-steel" />
-                      </div>
-                      <input
-                        {...register('location')}
-                        type="text"
-                        placeholder="e.g. Dallas TX, London UK"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
-                      />
-                    </div>
-                    {errors.location && <p className="text-red-400 text-sm mt-1.5">{errors.location.message}</p>}
-                  </div>
-                </div>
-
-                {isAtLimit ? (
-                  <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/30 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            {source === 'google_maps' ? (
+              <GlassCard className="p-8 max-w-3xl mx-auto border-ocean/40 bg-gradient-to-br from-ocean/30 to-navy">
+                <form onSubmit={mapsForm.handleSubmit(onSubmitMaps)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <p className="text-sm text-rose-300 font-semibold">Daily search limit reached</p>
-                      <p className="text-xs text-rose-400/80 mt-1">You've used all {searchesPerDay} searches today. Upgrade your plan or wait until tomorrow.</p>
-                      <Link href="/dashboard/billing" className="text-xs text-steel hover:underline mt-2 inline-block">Upgrade Plan →</Link>
+                      <label className="block text-sm font-medium text-ice/80 mb-2">Target Niche</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <Briefcase className="h-5 w-5 text-steel" />
+                        </div>
+                        <input
+                          {...mapsForm.register('niche')}
+                          type="text"
+                          placeholder="e.g. Plumbers, Dentists"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
+                        />
+                      </div>
+                      {mapsForm.formState.errors.niche && (
+                        <p className="text-red-400 text-sm mt-1.5">{mapsForm.formState.errors.niche.message}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-ice/80 mb-2">Location</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <MapPin className="h-5 w-5 text-steel" />
+                        </div>
+                        <input
+                          {...mapsForm.register('location')}
+                          type="text"
+                          placeholder="e.g. Dallas TX, London UK"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-steel/50 focus:border-steel transition-all text-offwhite text-lg placeholder-ice/40"
+                        />
+                      </div>
+                      {mapsForm.formState.errors.location && (
+                        <p className="text-red-400 text-sm mt-1.5">{mapsForm.formState.errors.location.message}</p>
+                      )}
                     </div>
                   </div>
+                  <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
+                </form>
+              </GlassCard>
+            ) : (
+              /* LinkedIn Search Form */
+              <div className="max-w-3xl mx-auto">
+                {linkedinSessionOk === false ? (
+                  <LinkedInCookieImport
+                    cookieJson={linkedinCookieJson}
+                    onCookieChange={setLinkedinCookieJson}
+                    onImport={handleImportCookies}
+                    isImporting={linkedinImporting}
+                    importError={linkedinImportError}
+                    onRetry={() => setLinkedinSessionOk(null)}
+                  />
                 ) : (
-                  <div className="bg-steel/10 p-4 rounded-xl border border-steel/20 flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-steel shrink-0 mt-0.5" />
-                    <p className="text-sm text-ice/80 leading-relaxed">
-                      Hyperclients will scrape Google Maps for <span className="font-semibold px-1 text-offwhite">up to 50 targeted</span> results, extract websites, and run them through our AI analyzer. The process usually takes 2-10 minutes depending on the city.
-                    </p>
-                  </div>
-                )}
+                  <GlassCard className="p-8 border-ocean/40 bg-gradient-to-br from-ocean/30 to-navy">
+                    <form onSubmit={(e) => { e.preventDefault(); onSubmitLinkedin(); }} className="space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-ice/80 mb-2">Keyword</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <SearchIcon className="h-5 w-5 text-accent-cyan" />
+                          </div>
+                          <input
+                            value={linkedinKeyword}
+                            onChange={(e) => setLinkedinKeyword(e.target.value)}
+                            type="text"
+                            placeholder="e.g. AI automation, website development..."
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/50 bg-navy/80 focus:bg-navy focus:ring-2 focus:ring-accent-cyan/50 focus:border-accent-cyan transition-all text-offwhite text-lg placeholder-ice/40"
+                          />
+                        </div>
+                      </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-ice/40">
-                    {remaining}/{searchesPerDay} searches remaining today
-                  </span>
-                  <LoadingButton
-                    type="submit"
-                    isLoading={isStarting}
-                    size="lg"
-                    fullWidth={false}
-                    variant={isAtLimit ? "outline" : "gradient"}
-                    className="text-lg py-4 px-8"
-                    disabled={isAtLimit}
-                  >
-                    <SearchIcon className="w-5 h-5" />
-                    Start Search
-                  </LoadingButton>
-                </div>
-              </form>
-            </GlassCard>
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Users className="w-4 h-4 text-ice/50" />
+                          <span className="text-xs text-ice/50 font-semibold uppercase tracking-wider">Lead Type</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {LEAD_TYPE_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setLinkedinLeadType(opt.value)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                linkedinLeadType === opt.value
+                                  ? 'bg-accent-purple/15 text-accent-purple border border-accent-purple/30'
+                                  : 'bg-navy/80 text-ice/50 border border-ocean/30 hover:border-ocean/60'
+                              }`}
+                              title={opt.desc}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Clock className="w-4 h-4 text-ice/50" />
+                          <span className="text-xs text-ice/50 font-semibold uppercase tracking-wider">Time Filter</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {LINKEDIN_TIME_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setLinkedinTimeFilter(opt.value)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                linkedinTimeFilter === opt.value
+                                  ? 'bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30'
+                                  : 'bg-navy/80 text-ice/50 border border-ocean/30 hover:border-ocean/60'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-accent-cyan/5 p-4 rounded-xl border border-accent-cyan/15 flex items-start gap-3">
+                        <Sparkles className="w-5 h-5 text-accent-cyan shrink-0 mt-0.5" />
+                        <p className="text-sm text-ice/70 leading-relaxed">
+                          Hyperclients will search LinkedIn for people expressing buying intent, score them with AI, and deliver qualified leads. Results typically in 1-3 minutes.
+                        </p>
+                      </div>
+
+                      <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
+
+                      <div className="flex items-center justify-between pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setLinkedinSessionOk(false)}
+                          className="text-xs text-ice/40 hover:text-ice/60 transition-colors"
+                        >
+                          Re-import cookies
+                        </button>
+                      </div>
+                    </form>
+                  </GlassCard>
+                )}
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div
@@ -249,6 +457,7 @@ export default function SearchPage() {
         )}
       </AnimatePresence>
 
+      {/* Live results */}
       {(progress || results.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -274,14 +483,12 @@ export default function SearchPage() {
               </div>
               {!isSearchActive && resultsTotal > 0 && (
                 <div className="flex justify-center mt-6 gap-4">
-                  <Link
-                    href="/dashboard/leads"
+                  <Link href="/dashboard/leads"
                     className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-offwhite bg-gradient-to-r from-steel to-ocean hover:from-steel/90 hover:to-ocean/90 transition-all shadow-[0_0_20px_rgba(74,127,167,0.4)] hover:shadow-[0_0_30px_rgba(74,127,167,0.6)]"
                   >
                     View All Leads in Dashboard
                   </Link>
-                  <button
-                    onClick={() => { clearActiveSearch(); }}
+                  <button onClick={() => { clearActiveSearch(); }}
                     className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all"
                   >
                     New Search
@@ -292,8 +499,7 @@ export default function SearchPage() {
           )}
           {!isSearchActive && progress && ['completed', 'failed', 'cancelled'].includes(progress.status ?? '') && (
             <div className="flex justify-center mt-6">
-              <button
-                onClick={() => { clearActiveSearch(); }}
+              <button onClick={() => { clearActiveSearch(); }}
                 className="inline-flex items-center justify-center px-6 py-2.5 font-semibold rounded-xl text-steel border border-steel/40 hover:bg-steel/10 transition-all"
               >
                 New Search
@@ -303,5 +509,110 @@ export default function SearchPage() {
         </motion.div>
       )}
     </div>
+  );
+}
+
+function SearchInfoSection({ isAtLimit, remaining, searchesPerDay, isStarting }: { isAtLimit: boolean; remaining: number; searchesPerDay: number; isStarting: boolean }) {
+  return (
+    <>
+      {isAtLimit ? (
+        <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/30 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-rose-300 font-semibold">Daily search limit reached</p>
+            <p className="text-xs text-rose-400/80 mt-1">You&apos;ve used all {searchesPerDay} searches today. Upgrade your plan or wait until tomorrow.</p>
+            <Link href="/dashboard/billing" className="text-xs text-steel hover:underline mt-2 inline-block">Upgrade Plan &rarr;</Link>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-steel/10 p-4 rounded-xl border border-steel/20 flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-steel shrink-0 mt-0.5" />
+          <p className="text-sm text-ice/70 leading-relaxed">
+            Hyperclients will search for targeted results, extract data, and run AI analysis. The process usually takes 2-10 minutes.
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-ice/40">
+          {remaining}/{searchesPerDay} searches remaining today
+        </span>
+        <LoadingButton
+          type="submit"
+          isLoading={isStarting}
+          size="lg"
+          fullWidth={false}
+          variant={isAtLimit ? 'outline' : 'gradient'}
+          className="text-lg py-4 px-8"
+          disabled={isAtLimit}
+        >
+          <SearchIcon className="w-5 h-5" />
+          Start Search
+        </LoadingButton>
+      </div>
+    </>
+  );
+}
+
+function LinkedInCookieImport({
+  cookieJson, onCookieChange, onImport, isImporting, importError, onRetry,
+}: {
+  cookieJson: string;
+  onCookieChange: (v: string) => void;
+  onImport: () => void;
+  isImporting: boolean;
+  importError: string;
+  onRetry: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="glass rounded-2xl p-8 md:p-12 max-w-md mx-auto text-center"
+    >
+      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center mx-auto mb-5">
+        <Linkedin className="w-8 h-8 text-accent-cyan" />
+      </div>
+      <h2 className="text-xl font-bold text-offwhite mb-2">LinkedIn Session Required</h2>
+      <p className="text-sm text-ice/50 mb-4 leading-relaxed">
+        Log into LinkedIn on your computer, install the Cookie-Editor extension, export cookies as JSON, then paste here.
+      </p>
+
+      <textarea
+        rows={6}
+        placeholder='[{&quot;name&quot;:&quot;li_at&quot;,&quot;value&quot;:&quot;...&quot;,...}]'
+        value={cookieJson}
+        onChange={(e) => onCookieChange(e.target.value)}
+        disabled={isImporting}
+        className="w-full px-4 py-3 rounded-xl text-sm bg-navy/80 border border-ocean/50 text-offwhite placeholder-ice/40 focus:outline-none focus:border-accent-cyan/50 mb-4 resize-none font-mono"
+      />
+
+      {importError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
+          <p className="text-sm text-red-400">{importError}</p>
+        </div>
+      )}
+
+      <motion.button
+        onClick={onImport}
+        disabled={isImporting || !cookieJson.trim()}
+        whileHover={{ scale: cookieJson.trim() ? 1.02 : 1 }}
+        whileTap={{ scale: cookieJson.trim() ? 0.98 : 1 }}
+        className="w-full h-11 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-accent-cyan to-accent-purple text-white hover:opacity-90 shadow-lg shadow-accent-cyan/20 disabled:opacity-50 transition-all"
+      >
+        {isImporting ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Importing...</>
+        ) : (
+          <><LogIn className="w-4 h-4" /> Import Cookies</>
+        )}
+      </motion.button>
+
+      <button
+        onClick={onRetry}
+        className="text-xs text-ice/40 hover:text-ice/60 mt-4 transition-colors"
+      >
+        Check session status
+      </button>
+    </motion.div>
   );
 }
