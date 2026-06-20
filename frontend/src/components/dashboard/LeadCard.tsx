@@ -130,6 +130,10 @@ export function LeadCard({ lead, onToggleFavorite, isUpdatingFav }: LeadCardProp
                 {lead.website_health_score}
               </span>
             )}
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold flex items-center gap-0.5 border border-emerald-500/20">
+              <MapPin className="w-2.5 h-2.5" />
+              Maps
+            </span>
           </div>
           <button
             onClick={(e) => {

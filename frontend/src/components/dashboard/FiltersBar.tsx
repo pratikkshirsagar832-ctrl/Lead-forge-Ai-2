@@ -30,11 +30,11 @@ export function FiltersBar() {
             <select
               value={filters.category}
               onChange={(e) => setFilters({ category: e.target.value })}
-              className="bg-transparent border-0 text-xs font-semibold text-ice/70 focus:ring-0 py-1 pl-1 pr-5 cursor-pointer outline-none appearance-none"
+              className="bg-transparent border-0 text-xs font-semibold text-offwhite focus:ring-0 py-1 pl-1 pr-5 cursor-pointer outline-none appearance-none"
             >
-              <option value="">All Categories</option>
+              <option value="" style={{ color: '#cbd5e1', background: '#1e293b' }}>All Categories</option>
               {Object.entries(LEAD_CATEGORIES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
+                <option key={key} value={key} style={{ color: '#cbd5e1', background: '#1e293b' }}>{label}</option>
               ))}
             </select>
           </div>
@@ -44,11 +44,11 @@ export function FiltersBar() {
             <select
               value={filters.status}
               onChange={(e) => setFilters({ status: e.target.value })}
-              className="bg-transparent border-0 text-xs font-semibold text-ice/70 focus:ring-0 py-1 pl-1 pr-5 cursor-pointer outline-none appearance-none"
+              className="bg-transparent border-0 text-xs font-semibold text-offwhite focus:ring-0 py-1 pl-1 pr-5 cursor-pointer outline-none appearance-none"
             >
-              <option value="">All Statuses</option>
+              <option value="" style={{ color: '#cbd5e1', background: '#1e293b' }}>All Statuses</option>
               {Object.entries(USER_STATUSES).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
+                <option key={key} value={key} style={{ color: '#cbd5e1', background: '#1e293b' }}>{label}</option>
               ))}
             </select>
           </div>
@@ -57,10 +57,10 @@ export function FiltersBar() {
             <select
               value={filters.isFavorite === null ? '' : String(filters.isFavorite)}
               onChange={(e) => setFilters({ isFavorite: e.target.value === '' ? null : e.target.value === 'true' })}
-              className="bg-transparent border-0 text-xs font-semibold text-ice/70 focus:ring-0 py-1 cursor-pointer outline-none appearance-none"
+              className="bg-transparent border-0 text-xs font-semibold text-offwhite focus:ring-0 py-1 cursor-pointer outline-none appearance-none"
             >
-              <option value="">All Leads</option>
-              <option value="true">Favorites Only</option>
+              <option value="" style={{ color: '#cbd5e1', background: '#1e293b' }}>All Leads</option>
+              <option value="true" style={{ color: '#cbd5e1', background: '#1e293b' }}>Favorites Only</option>
             </select>
           </div>
 
@@ -69,7 +69,7 @@ export function FiltersBar() {
             size="sm"
             onClick={exportCsv}
             isLoading={isExporting}
-            className="gap-1.5 border-steel/30 text-ice/70 hover:bg-steel/10"
+            className="gap-1.5 border-steel/30 text-offwhite hover:bg-steel/10"
           >
             <Download className="w-3.5 h-3.5" />
             Export

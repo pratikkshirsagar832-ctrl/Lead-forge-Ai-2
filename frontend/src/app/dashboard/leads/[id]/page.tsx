@@ -16,7 +16,7 @@ import {
   ArrowLeft, MapPin, Phone, Globe, Star,
   MessageSquare, FileText, ExternalLink,
   Loader2, CheckCircle2, Target, Send,
-  Linkedin, Quote, Activity
+  Linkedin, Quote, Activity, Users
 } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -187,6 +187,22 @@ export default function LeadDetailPage() {
                   >
                     {categoryConfig.label}
                   </Badge>
+                  {lead.source && (
+                    <Badge
+                      variant="outline"
+                      className={
+                        lead.source === 'linkedin'
+                          ? 'border-accent-cyan/30 text-accent-cyan bg-accent-cyan/5'
+                          : 'border-emerald-500/30 text-emerald-400 bg-emerald-500/5'
+                      }
+                    >
+                      {lead.source === 'linkedin' ? (
+                        <><Users className="w-3 h-3 mr-1" />LinkedIn</>
+                      ) : (
+                        <><MapPin className="w-3 h-3 mr-1" />Google Maps</>
+                      )}
+                    </Badge>
+                  )}
                   {lead.is_favorite && (
                     <Badge variant="outline" className="border-rose-500/30 text-rose-400 bg-rose-500/10">
                       Favorited

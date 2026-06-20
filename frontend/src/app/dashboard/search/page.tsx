@@ -64,15 +64,18 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
           <div className="glass-card-premium rounded-xl hover:border-accent-cyan/20 transition-all duration-300 hover:-translate-y-1">
             <div className="p-4">
               <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0 ring-1 ring-accent-cyan/20">
-                    <Users className="w-4 h-4 text-accent-cyan" />
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0 ring-1 ring-accent-cyan/20">
+                      <Users className="w-4 h-4 text-accent-cyan" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-offwhite truncate flex items-center gap-1.5">
+                        {lead.author_name || 'LinkedIn User'}
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-cyan/10 text-accent-cyan font-semibold shrink-0">LinkedIn</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-offwhite truncate">{lead.author_name || 'LinkedIn User'}</p>
-                  </div>
-                </div>
-                {lead.intent_score >= 0.7 && (
+                  {lead.intent_score >= 0.7 && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 font-semibold shrink-0">
                     <Zap className="w-3 h-3" />
                     {scorePercent}%
@@ -137,14 +140,18 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
       <Link href={`/dashboard/leads/${lead.id}`} className="block group">
         <div className="glass-card-premium rounded-xl hover:border-steel/30 transition-all duration-300 hover:-translate-y-1">
           <div className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Badge
-                  style={{ backgroundColor: (catCfg as any).bg, color: catCfg.color }}
-                  className="font-bold border-0 text-[10px] px-2 py-0.5"
-                >
-                  {catCfg.label}
-                </Badge>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Badge
+                    style={{ backgroundColor: (catCfg as any).bg, color: catCfg.color }}
+                    className="font-bold border-0 text-[10px] px-2 py-0.5"
+                  >
+                    {catCfg.label}
+                  </Badge>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold flex items-center gap-0.5 border border-emerald-500/20">
+                    <MapPin className="w-2.5 h-2.5" />
+                    Maps
+                  </span>
                 {lead.website_health_score != null && (
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                     lead.website_health_score >= 70 ? 'text-emerald-400 bg-emerald-500/10' :
