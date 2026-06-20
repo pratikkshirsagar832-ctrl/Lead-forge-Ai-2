@@ -29,7 +29,7 @@ from app.schemas.search import (
     SearchResponse,
     SearchStatusResponse,
 )
-from app.services.pipeline import cancel_search, run_search_pipeline, load_more_maps_search
+from app.services.pipeline import cancel_search, run_search_pipeline, load_more_maps_search, load_more_linkedin_search
 
 router = APIRouter(prefix="/api/searches", tags=["Searches"])
 
@@ -378,15 +378,21 @@ async def load_more_results(
             raise HTTPException(status_code=404, detail="Search not found")
 
         search = response.data[0]
-        if search["source"] != "google_maps":
-            raise HTTPException(status_code=400, detail="Load more only supported for Google Maps searches")
+        source = search.get("source", "google_maps")
 
-        new_count = await load_more_maps_search(
-            search_id=search_id,
-            user_id=current_user["id"],
-            niche=search["niche"],
-            location=search["location"],
-        )
+        if source == "linkedin":
+            new_count = await load_more_linkedin_search(
+                search_id=search_id,
+                user_id=current_user["id"],
+                keyword=search["niche"],
+            )
+        else:
+            new_count = await load_more_maps_search(
+                search_id=search_id,
+                user_id=current_user["id"],
+                niche=search["niche"],
+                location=search["location"],
+            )
 
         return {
             "new_leads": new_count,

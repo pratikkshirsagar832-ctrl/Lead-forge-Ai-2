@@ -80,6 +80,58 @@ async def run_search_pipeline(
         _active_searches.pop(search_id, None)
 
 
+async def load_more_linkedin_search(
+    search_id: str,
+    user_id: str,
+    keyword: str,
+) -> int:
+    """Load 10 more LinkedIn leads by scraping additional queries."""
+    supabase = get_supabase_admin()
+    engine = _get_linkedin_engine(user_id)
+
+    existing = await asyncio.to_thread(
+        lambda: supabase.table("leads")
+        .select("author_name")
+        .eq("search_id", search_id)
+        .execute()
+    )
+    existing_authors: set[str] = set()
+    for row in existing.data or []:
+        name = (row.get("author_name") or "").strip().lower()
+        if name:
+            existing_authors.add(name)
+
+    queries = await engine.generate_queries(keyword, "all")
+    new_leads: list[dict] = []
+
+    for query in queries[:5]:
+        if len(new_leads) >= 10:
+            break
+        raw = await engine.scrape_query(query, "latest")
+        if not raw:
+            continue
+        leads = await engine.ai_extract(raw, query, "all")
+        for lead in leads:
+            author = lead.get("author_name", "").strip().lower()
+            if author and author in existing_authors:
+                continue
+            if author:
+                existing_authors.add(author)
+            lead["keyword"] = query
+            new_leads.append(lead)
+            if len(new_leads) >= 10:
+                break
+
+    if not new_leads:
+        logger.info(f"[Pipeline:{search_id}] No new unique LinkedIn leads found for load-more")
+        return 0
+
+    saved_ids = await engine.save_leads(search_id, user_id, new_leads)
+    logger.info(f"[Pipeline:{search_id}] Load-more saved {len(saved_ids)} new LinkedIn leads")
+    await _finalize_search(supabase, search_id)
+    return len(saved_ids)
+
+
 async def load_more_maps_search(
     search_id: str,
     user_id: str,
