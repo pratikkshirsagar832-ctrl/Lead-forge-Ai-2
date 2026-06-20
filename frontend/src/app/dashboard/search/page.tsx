@@ -12,7 +12,9 @@ import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
 import { UpgradeModal } from '@/components/shared/UpgradeModal';
-import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, Zap, Target, Filter, ArrowRight, Cookie, Activity, Hash } from 'lucide-react';
+import { API_ROUTES } from '@/lib/constants';
+import { useSearchStore } from '@/stores/searchStore';
+import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, Zap, Target, Filter, ArrowRight, Cookie, Activity, Hash, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { LEAD_CATEGORIES } from '@/lib/constants';
@@ -200,6 +202,7 @@ export default function SearchPage() {
   const [linkedinImporting, setLinkedinImporting] = useState(false);
   const [linkedinImportError, setLinkedinImportError] = useState('');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const mapsForm = useForm({ resolver: zodResolver(mapsSchema) });
 
@@ -259,6 +262,24 @@ export default function SearchPage() {
     }
   };
 
+  const handleLoadMore = useCallback(async () => {
+    if (!activeSearchId || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const { data } = await api.post(API_ROUTES.searches.loadMore(activeSearchId), {});
+      if (data.new_leads > 0) {
+        const { data: newResults } = await api.get(`${API_ROUTES.searches.detail(activeSearchId)}/results?page=1&per_page=50`);
+        if (newResults.items) {
+          useSearchStore.getState().appendResults(newResults.items);
+        }
+      }
+    } catch (e: any) {
+      console.error('Load more failed:', e);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [activeSearchId, isLoadingMore]);
+
   const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
 
   return (
@@ -270,16 +291,6 @@ export default function SearchPage() {
           </h1>
           <p className="text-ice/50 mt-2 text-sm">Find and qualify leads from multiple sources.</p>
         </div>
-        {activeSearchId && (
-          <LoadingButton
-            onClick={() => { clearActiveSearch(); }}
-            variant="glass"
-            size="md"
-            icon={<ArrowRight className="w-4 h-4" />}
-          >
-            New Search
-          </LoadingButton>
-        )}
       </div>
 
       {!isSearchActive && !progress && (
@@ -552,19 +563,20 @@ export default function SearchPage() {
                   >
                     View All Leads in Dashboard
                   </Link>
-                  <LoadingButton onClick={() => { clearActiveSearch(); }} variant="glass" size="md">
-                    New Search
-                  </LoadingButton>
+                  {results.length >= 10 && (
+                    <LoadingButton
+                      onClick={handleLoadMore}
+                      isLoading={isLoadingMore}
+                      variant="glass"
+                      size="md"
+                      icon={<Search className="w-4 h-4" />}
+                    >
+                      Load 10 More
+                    </LoadingButton>
+                  )}
                 </div>
               )}
             </>
-          )}
-          {!isSearchActive && progress && ['completed', 'failed', 'cancelled'].includes(progress.status ?? '') && (
-            <div className="flex justify-center mt-6">
-              <LoadingButton onClick={() => { clearActiveSearch(); }} variant="glass" size="md">
-                New Search
-              </LoadingButton>
-            </div>
           )}
         </motion.div>
       )}

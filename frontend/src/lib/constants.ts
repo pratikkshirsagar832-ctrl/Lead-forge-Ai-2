@@ -6,6 +6,7 @@ export const API_ROUTES = {
     detail: (id: string) => `/api/searches/${id}`,
     status: (id: string) => `/api/searches/${id}/status`,
     cancel: (id: string) => `/api/searches/${id}/cancel`,
+    loadMore: (id: string) => `/api/searches/${id}/load-more`,
   },
   leads: {
     list: '/api/leads',

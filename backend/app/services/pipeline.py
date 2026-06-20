@@ -24,7 +24,7 @@ _active_searches: dict[str, bool] = {}
 _linkedin_engine: LinkedInSearchEngine | None = None
 
 MAX_SEARCH_TIME_SECONDS = 600
-MAX_RESULTS = 50
+MAX_RESULTS = 10
 
 
 def _get_linkedin_engine() -> LinkedInSearchEngine:
@@ -85,6 +85,62 @@ async def run_search_pipeline(
         _active_searches.pop(search_id, None)
 
 
+async def load_more_maps_search(
+    search_id: str,
+    user_id: str,
+    niche: str,
+    location: str,
+) -> int:
+    """Load 10 more results for an existing search."""
+    supabase = get_supabase_admin()
+    query = f"{niche} in {location}"
+
+    # Get already-saved business names to avoid duplicates
+    existing = await asyncio.to_thread(
+        lambda: supabase.table("leads")
+        .select("business_name")
+        .eq("search_id", search_id)
+        .execute()
+    )
+    existing_names = set()
+    for row in existing.data or []:
+        name = (row.get("business_name") or "").strip().lower()
+        if name:
+            existing_names.add(name)
+
+    try:
+        raw_results = await run_maps_scraper(
+            query=query,
+            max_results=20,
+            timeout_seconds=120,
+            depth=2,
+        )
+    except Exception as e:
+        logger.error(f"[Pipeline:{search_id}] Load more scraper failed: {e}")
+        return 0
+
+    # Filter out duplicates
+    new_results = []
+    for r in raw_results:
+        name = (r.get("business_name") or "").strip().lower()
+        if name and name not in existing_names:
+            existing_names.add(name)
+            new_results.append(r)
+            if len(new_results) >= 10:
+                break
+
+    if not new_results:
+        logger.info(f"[Pipeline:{search_id}] No new unique leads found for load-more")
+        return 0
+
+    lead_ids = await _save_maps_leads(supabase, search_id, user_id, new_results)
+    logger.info(f"[Pipeline:{search_id}] Load-more saved {len(lead_ids)} new leads")
+
+    # Update search totals
+    await _finalize_search(supabase, search_id)
+    return len(lead_ids)
+
+
 async def _run_maps_search(
     supabase, search_id: str, user_id: str, niche: str, location: str, start_time: float
 ) -> None:
@@ -102,6 +158,7 @@ async def _run_maps_search(
             query=query,
             max_results=MAX_RESULTS,
             timeout_seconds=remaining_timeout,
+            depth=1,
         )
     except Exception as e:
         logger.error(f"[Pipeline:{search_id}] Maps scraper failed: {e}")

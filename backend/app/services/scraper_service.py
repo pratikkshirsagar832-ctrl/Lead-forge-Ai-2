@@ -66,6 +66,7 @@ async def run_maps_scraper(
     query: str,
     max_results: int = 50,
     timeout_seconds: int = 300,
+    depth: int = 1,
 ) -> list[dict]:
     """
     Run the google-maps-scraper binary and return parsed results.
@@ -74,6 +75,7 @@ async def run_maps_scraper(
         query: Search query (e.g., "plumbers in New York")
         max_results: Maximum number of results to return
         timeout_seconds: Max time to wait for the scraper process
+        depth: Number of pages to scrape (1 = fast, 3 = thorough)
 
     Returns:
         List of business dicts parsed from the CSV output.
@@ -96,8 +98,8 @@ async def run_maps_scraper(
             scraper_path,
             "-input", input_file,
             "-results", output_file,
-            "-exit-on-inactivity", "3m",
-            "-depth", "3",
+            "-exit-on-inactivity", "30s",
+            "-depth", str(depth),
             "-c", "4",
             "-email"
         ]
