@@ -610,22 +610,39 @@ class LinkedInSearchEngine:
         self, topic: str, time_filter: str = "latest", lead_type: str = "all"
     ) -> dict:
         queries = await self.generate_queries(topic, lead_type)
-        raw = await self.scrape_query(queries[0], time_filter)
-        if raw is None:
-            logger.warning(f"LinkedIn scraper failed for topic '{topic}' — session may be invalid")
+        all_qualified: list[dict] = []
+        seen_authors: set[str] = set()
+        any_session_valid = True
+
+        for i, query in enumerate(queries[:5]):
+            if len(all_qualified) >= 25:
+                break
+            raw = await self.scrape_query(query, time_filter)
+            if raw is None:
+                logger.warning(f"LinkedIn scraper failed on query '{query}' — session may be invalid")
+                any_session_valid = False
+                continue
+            if not raw:
+                logger.info(f"LinkedIn scrape returned 0 posts for query '{query}'")
+                continue
+            logger.info(f"Query {i+1} '{query}': {len(raw)} raw posts")
+            leads = await self.ai_extract(raw, query, lead_type)
+            for lead in leads:
+                author = lead.get("author_name", "").lower().strip()
+                if author and author not in seen_authors:
+                    seen_authors.add(author)
+                    all_qualified.append(lead)
+            logger.info(f"Query {i+1}: {len(leads)} qualified (total unique: {len(all_qualified)})")
+
+        if not any_session_valid:
             return {"leads": [], "has_more": False, "session_valid": False}
-        if not raw:
-            logger.info(f"LinkedIn scrape returned 0 posts for query '{queries[0]}' — no matching results found")
-            return {"leads": [], "has_more": False, "session_valid": True, "all_leads": []}
-        logger.info(f"LinkedIn scrape found {len(raw)} raw posts for query '{queries[0]}', running AI extraction...")
-        leads = await self.ai_extract(raw, queries[0], lead_type)
-        logger.info(f"AI extraction returned {len(leads)} qualified leads out of {len(raw)} raw posts")
+        logger.info(f"LinkedIn search complete: {len(all_qualified)} unique qualified leads from {len(queries)} queries")
         return {
-            "leads": leads[:10],
-            "has_more": len(leads) > 10 or len(queries) > 1,
+            "leads": all_qualified[:10],
+            "has_more": len(all_qualified) > 10,
             "session_valid": True,
             "lead_type": lead_type,
-            "all_leads": leads,
+            "all_leads": all_qualified,
         }
 
     async def load_more(self, prev_leads: list[dict], all_leads: list[dict]) -> dict:
