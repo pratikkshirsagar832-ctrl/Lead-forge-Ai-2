@@ -510,6 +510,24 @@ export default function SearchPage() {
                           Re-import cookies
                         </button>
                       </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-ocean/20">
+                        <span className="text-xs text-ice/40">
+                          {remaining}/{searchesPerDay} searches remaining today
+                        </span>
+                        <LoadingButton
+                          type="submit"
+                          isLoading={isStarting}
+                          size="lg"
+                          fullWidth={false}
+                          variant={isAtLimit ? 'outline' : 'gradient-cyan'}
+                          className="text-lg py-4 px-8"
+                          disabled={isAtLimit}
+                        >
+                          <SearchIcon className="w-5 h-5" />
+                          Start Search
+                        </LoadingButton>
+                      </div>
                     </form>
                   </div>
                 )}
