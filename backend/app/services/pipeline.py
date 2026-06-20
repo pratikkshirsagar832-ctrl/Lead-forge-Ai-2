@@ -14,7 +14,7 @@ import time
 from datetime import date, datetime, timezone
 
 from app.database import get_supabase_admin
-from app.services.scraper_service import run_maps_scraper
+from app.services.scraper_service import scrapling_maps_scraper, run_maps_scraper
 from app.services.linkedin_scraper_service import LinkedInSearchEngine
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ _search_semaphore = asyncio.Semaphore(3)
 _active_searches: dict[str, bool] = {}
 _linkedin_engine: LinkedInSearchEngine | None = None
 
-MAX_SEARCH_TIME_SECONDS = 600
+MAX_SEARCH_TIME_SECONDS = 60
 MAX_RESULTS = 10
 
 
@@ -154,11 +154,9 @@ async def _run_maps_search(
     })
 
     try:
-        raw_results = await run_maps_scraper(
+        raw_results = await scrapling_maps_scraper(
             query=query,
             max_results=MAX_RESULTS,
-            timeout_seconds=remaining_timeout,
-            depth=1,
         )
     except Exception as e:
         logger.error(f"[Pipeline:{search_id}] Maps scraper failed: {e}")

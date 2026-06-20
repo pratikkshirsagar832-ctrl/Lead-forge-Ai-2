@@ -14,7 +14,7 @@ import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
 import { UpgradeModal } from '@/components/shared/UpgradeModal';
 import { API_ROUTES } from '@/lib/constants';
 import { useSearchStore } from '@/stores/searchStore';
-import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, Zap, Target, Filter, ArrowRight, Cookie, Activity, Hash, Search } from 'lucide-react';
+import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, Zap, Target, Filter, Cookie, Activity, Hash, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { LEAD_CATEGORIES } from '@/lib/constants';
@@ -287,9 +287,9 @@ export default function SearchPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-offwhite tracking-tight">
-            <span className="gradient-text">New Search</span>
+            <span className="gradient-text">Finding hot leads</span>
           </h1>
-          <p className="text-ice/50 mt-2 text-sm">Find and qualify leads from multiple sources.</p>
+          <p className="text-ice/50 mt-2 text-sm">Find and qualify leads from Google Maps in seconds.</p>
         </div>
       </div>
 
@@ -557,7 +557,7 @@ export default function SearchPage() {
                 ))}
               </div>
               {!isSearchActive && resultsTotal > 0 && (
-                <div className="flex justify-center mt-6 gap-4">
+                <div className="flex justify-center mt-6 gap-4 flex-wrap">
                   <Link href="/dashboard/leads"
                     className="btn-gradient-cyan inline-flex items-center justify-center px-6 py-2.5 rounded-xl text-sm shadow-lg hover:-translate-y-0.5 transition-all"
                   >
@@ -569,11 +569,18 @@ export default function SearchPage() {
                       isLoading={isLoadingMore}
                       variant="glass"
                       size="md"
-                      icon={<Search className="w-4 h-4" />}
                     >
+                      <Search className="w-4 h-4 mr-1.5" />
                       Load 10 More
                     </LoadingButton>
                   )}
+                  <LoadingButton
+                    onClick={() => { clearActiveSearch(); }}
+                    variant="glass"
+                    size="md"
+                  >
+                    New Search
+                  </LoadingButton>
                 </div>
               )}
             </>
