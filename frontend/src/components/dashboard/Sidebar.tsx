@@ -21,6 +21,7 @@ import {
   User,
   Zap,
   Sparkles,
+  ArrowUpRight,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -138,9 +139,20 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-offwhite truncate">{user?.email || 'User'}</p>
-              <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded border', planColor)}>
-                {planBadge === 'Free' && subscription?.is_trial_expired ? 'Trial Expired' : planBadge}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded border', planColor)}>
+                  {planBadge === 'Free' && subscription?.is_trial_expired ? 'Trial Expired' : planBadge}
+                </span>
+                {planBadge === 'Free' && (
+                  <Link
+                    href="/dashboard/billing"
+                    className="text-[10px] font-semibold text-accent-cyan hover:text-accent-cyan/80 transition-colors flex items-center gap-0.5"
+                  >
+                    Upgrade
+                    <ArrowUpRight className="w-3 h-3" />
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
 

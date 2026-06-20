@@ -11,6 +11,7 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
+import { UpgradeModal } from '@/components/shared/UpgradeModal';
 import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Clock, LogIn, Loader2, Quote, ExternalLink, Zap, Target, Filter, ArrowRight, Cookie, Activity, Hash } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -198,6 +199,7 @@ export default function SearchPage() {
   const [linkedinCookieJson, setLinkedinCookieJson] = useState('');
   const [linkedinImporting, setLinkedinImporting] = useState(false);
   const [linkedinImportError, setLinkedinImportError] = useState('');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const mapsForm = useForm({ resolver: zodResolver(mapsSchema) });
 
@@ -239,13 +241,22 @@ export default function SearchPage() {
   }, [linkedinCookieJson]);
 
   const onSubmitMaps = async (data: { niche: string; location: string }) => {
-    if (isAtLimit) return;
-    await startSearch(data.niche, data.location);
+    if (isAtLimit) { setShowUpgradeModal(true); return; }
+    try {
+      await startSearch(data.niche, data.location);
+    } catch (e: any) {
+      if (e.response?.status === 429) setShowUpgradeModal(true);
+    }
   };
 
   const onSubmitLinkedin = async () => {
-    if (isAtLimit || !linkedinKeyword.trim()) return;
-    await startSearch(linkedinKeyword.trim(), 'linkedin');
+    if (isAtLimit) { setShowUpgradeModal(true); return; }
+    if (!linkedinKeyword.trim()) return;
+    try {
+      await startSearch(linkedinKeyword.trim(), 'linkedin');
+    } catch (e: any) {
+      if (e.response?.status === 429) setShowUpgradeModal(true);
+    }
   };
 
   const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
@@ -557,6 +568,8 @@ export default function SearchPage() {
           )}
         </motion.div>
       )}
+
+      <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} type="limit" />
     </div>
   );
 }
