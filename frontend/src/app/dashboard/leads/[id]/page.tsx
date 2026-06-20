@@ -15,7 +15,8 @@ import { DeepAnalysisReport } from '@/components/dashboard/DeepAnalysisReport';
 import {
   ArrowLeft, MapPin, Phone, Globe, Star,
   MessageSquare, FileText, ExternalLink,
-  Loader2, CheckCircle2, Target, Send
+  Loader2, CheckCircle2, Target, Send,
+  Linkedin, Quote, Activity
 } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
@@ -232,40 +233,96 @@ export default function LeadDetailPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-6 border-y border-ocean/30">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-lg bg-steel/20 text-steel shrink-0">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-ice/60 mb-0.5">Address</p>
-                  <p className="text-offwhite">{lead.full_address || 'No address provided'}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-lg bg-steel/20 text-steel shrink-0">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-ice/60 mb-0.5">Phone</p>
-                  <p className="text-offwhite">{lead.phone || 'No phone provided'}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-lg bg-steel/20 text-steel shrink-0">
-                  <Globe className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-ice/60 mb-0.5">Website</p>
-                  {lead.website_url ? (
-                    <a href={lead.website_url} target="_blank" rel="noreferrer" className="text-steel hover:text-ice hover:underline flex items-center gap-1 group">
-                      {lead.website_url.replace(/^https?:\/\/(www\.)?/, '')}
-                      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                  ) : (
-                    <p className="text-offwhite">No website provided</p>
-                  )}
-                </div>
-              </div>
+              {lead.source === 'linkedin' ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-accent-cyan/20 text-accent-cyan shrink-0">
+                      <Linkedin className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ice/60 mb-0.5">LinkedIn Profile</p>
+                      {lead.author_profile ? (
+                        <a href={lead.author_profile} target="_blank" rel="noreferrer" className="text-steel hover:text-ice hover:underline flex items-center gap-1 group truncate">
+                          {lead.author_name || 'View Profile'}
+                          <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </a>
+                      ) : (
+                        <p className="text-offwhite">{lead.author_name || 'No profile'}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-accent-purple/20 text-accent-purple shrink-0">
+                      <Activity className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-ice/60 mb-0.5">Intent Score</p>
+                      <p className="text-offwhite font-semibold">
+                        {lead.intent_score != null ? `${Math.round(lead.intent_score * 100)}%` : 'N/A'}
+                        {lead.intent_reason && (
+                          <span className="text-sm font-normal text-ice/60 ml-2 italic">— {lead.intent_reason}</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2 flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-accent-cyan/20 text-accent-cyan shrink-0">
+                      <Quote className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ice/60 mb-0.5">Post</p>
+                      {lead.post_text ? (
+                        <p className="text-offwhite text-sm leading-relaxed">{lead.post_text}</p>
+                      ) : (
+                        <p className="text-offwhite">No post text</p>
+                      )}
+                      {lead.post_url && (
+                        <a href={lead.post_url} target="_blank" rel="noreferrer" className="text-steel hover:text-ice hover:underline flex items-center gap-1 mt-2 text-sm">
+                          <ExternalLink className="w-3 h-3" />
+                          View on LinkedIn
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-steel/20 text-steel shrink-0">
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-ice/60 mb-0.5">Address</p>
+                      <p className="text-offwhite">{lead.full_address || 'No address provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-steel/20 text-steel shrink-0">
+                      <Phone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-ice/60 mb-0.5">Phone</p>
+                      <p className="text-offwhite">{lead.phone || 'No phone provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-lg bg-steel/20 text-steel shrink-0">
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-ice/60 mb-0.5">Website</p>
+                      {lead.website_url ? (
+                        <a href={lead.website_url} target="_blank" rel="noreferrer" className="text-steel hover:text-ice hover:underline flex items-center gap-1 group">
+                          {lead.website_url.replace(/^https?:\/\/(www\.)?/, '')}
+                          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </a>
+                      ) : (
+                        <p className="text-offwhite">No website provided</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="mt-8">

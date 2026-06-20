@@ -85,12 +85,30 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
                   {lead.post_text}
                 </p>
               )}
-              <div className="flex items-center gap-2 text-[11px] text-ice/40">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ice/40">
+                {lead.author_profile && (
+                  <a
+                    href={lead.author_profile}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 text-accent-cyan/60 hover:text-accent-cyan transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    View Profile
+                  </a>
+                )}
                 {lead.post_url && (
-                  <span className="flex items-center gap-1 text-accent-cyan/60">
+                  <a
+                    href={lead.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 text-accent-cyan/60 hover:text-accent-cyan transition-colors"
+                  >
                     <ExternalLink className="w-3 h-3" />
                     View Post
-                  </span>
+                  </a>
                 )}
                 {lead.intent_reason && (
                   <span className="truncate italic text-ice/40">{lead.intent_reason}</span>
