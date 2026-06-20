@@ -12,7 +12,7 @@ class LeadListItem(BaseModel):
     """Compact lead for list views."""
     id: str
     search_id: str
-    business_name: str
+    business_name: str = "Unknown Business"
     category: Optional[str] = None
     full_address: Optional[str] = None
     phone: Optional[str] = None

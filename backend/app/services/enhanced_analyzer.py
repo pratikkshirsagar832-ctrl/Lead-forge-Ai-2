@@ -11,7 +11,12 @@ import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from scrapling import AsyncFetcher
+try:
+    from scrapling import AsyncFetcher
+    _SCRAPLING_AVAILABLE = True
+except ImportError:
+    AsyncFetcher = None
+    _SCRAPLING_AVAILABLE = False
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +60,9 @@ VP_KEYWORDS = [
 async def analyze_website(url: str) -> dict[str, Any]:
     if not url:
         return _empty_result("No website URL provided")
+    if not _SCRAPLING_AVAILABLE:
+        logger.error("Scrapling library not installed — cannot analyze website")
+        return _empty_result("Scraper library not available: scrapling is not installed")
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
 

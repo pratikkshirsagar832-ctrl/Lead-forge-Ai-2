@@ -466,10 +466,11 @@ class LinkedInSearchEngine:
 
             except Exception as e:
                 if attempt < self.max_retries - 1:
+                    logger.warning(f"LinkedIn scrape attempt {attempt + 1} failed: {e}")
                     await asyncio.sleep(3)
                 else:
-                    logger.error(f"LinkedIn scrape failed after {self.max_retries} attempts: {e}")
-                    return []
+                    logger.error(f"LinkedIn scrape failed after {self.max_retries} attempts: {e}", exc_info=True)
+                    return None
         return []
 
     async def ai_extract(
@@ -607,8 +608,14 @@ class LinkedInSearchEngine:
         queries = await self.generate_queries(topic, lead_type)
         raw = await self.scrape_query(queries[0], time_filter)
         if raw is None:
+            logger.warning(f"LinkedIn scraper failed for topic '{topic}' — session may be invalid")
             return {"leads": [], "has_more": False, "session_valid": False}
+        if not raw:
+            logger.info(f"LinkedIn scrape returned 0 posts for query '{queries[0]}' — no matching results found")
+            return {"leads": [], "has_more": False, "session_valid": True, "all_leads": []}
+        logger.info(f"LinkedIn scrape found {len(raw)} raw posts for query '{queries[0]}', running AI extraction...")
         leads = await self.ai_extract(raw, queries[0], lead_type)
+        logger.info(f"AI extraction returned {len(leads)} qualified leads out of {len(raw)} raw posts")
         return {
             "leads": leads[:10],
             "has_more": len(leads) > 10 or len(queries) > 1,
@@ -630,11 +637,13 @@ class LinkedInSearchEngine:
         saved_ids = []
         for lead in leads:
             try:
+                author_name = lead.get("author_name", "LinkedIn User")
                 lead_data = {
                     "search_id": search_id,
                     "user_id": user_id,
                     "source": "linkedin",
-                    "author_name": lead.get("author_name", "LinkedIn User"),
+                    "business_name": author_name,
+                    "author_name": author_name,
                     "author_profile": lead.get("author_profile", ""),
                     "post_text": lead.get("post_text", ""),
                     "post_url": lead.get("post_url", ""),

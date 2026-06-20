@@ -500,8 +500,6 @@ export default function SearchPage() {
                         </p>
                       </div>
 
-                      <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
-
                       <div className="flex items-center justify-between pt-2">
                         <button
                           type="button"
