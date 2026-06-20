@@ -103,24 +103,28 @@ async def load_more_linkedin_search(
 
     queries = await engine.generate_queries(keyword, "all")
     new_leads: list[dict] = []
+    TIME_FILTERS = ["latest", "7_days", "14_days", "27_days", "2_months"]
 
     for query in queries[:5]:
         if len(new_leads) >= 10:
             break
-        raw = await engine.scrape_query(query, "latest")
-        if not raw:
-            continue
-        leads = await engine.ai_extract(raw, query, "all")
-        for lead in leads:
-            author = lead.get("author_name", "").strip().lower()
-            if author and author in existing_authors:
-                continue
-            if author:
-                existing_authors.add(author)
-            lead["keyword"] = query
-            new_leads.append(lead)
+        for tf in TIME_FILTERS:
             if len(new_leads) >= 10:
                 break
+            raw = await engine.scrape_query(query, tf)
+            if not raw:
+                continue
+            leads = await engine.ai_extract(raw, query, "all")
+            for lead in leads:
+                author = lead.get("author_name", "").strip().lower()
+                if author and author in existing_authors:
+                    continue
+                if author:
+                    existing_authors.add(author)
+                lead["keyword"] = query
+                new_leads.append(lead)
+                if len(new_leads) >= 10:
+                    break
 
     if not new_leads:
         logger.info(f"[Pipeline:{search_id}] No new unique LinkedIn leads found for load-more")
@@ -253,7 +257,7 @@ async def _run_linkedin_search(
         if result.get("session_valid") is False:
             await _update_search(supabase, search_id, {
                 "status": "failed",
-                "message": "LinkedIn session expired. Please re-import your cookies.",
+                "message": "LinkedIn session expired. Re-import cookies from LinkedIn → Settings → Data Privacy → Export, then paste here.",
                 "error_message": "LinkedIn session expired",
                 "progress_percent": 0,
             })
@@ -263,7 +267,7 @@ async def _run_linkedin_search(
         if not all_leads:
             await _update_search(supabase, search_id, {
                 "status": "completed", "progress_percent": 100,
-                "message": "No leads found on LinkedIn. Try a different keyword.",
+                "message": "No leads found on LinkedIn. Try a different keyword or re-import your LinkedIn session cookies.",
                 "total_results": 0,
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             })
