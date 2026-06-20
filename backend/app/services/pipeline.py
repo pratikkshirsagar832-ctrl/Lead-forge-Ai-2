@@ -21,17 +21,12 @@ logger = logging.getLogger(__name__)
 
 _search_semaphore = asyncio.Semaphore(3)
 _active_searches: dict[str, bool] = {}
-_linkedin_engine: LinkedInSearchEngine | None = None
-
 MAX_SEARCH_TIME_SECONDS = 600
 MAX_RESULTS = 25
 
 
-def _get_linkedin_engine() -> LinkedInSearchEngine:
-    global _linkedin_engine
-    if _linkedin_engine is None:
-        _linkedin_engine = LinkedInSearchEngine()
-    return _linkedin_engine
+def _get_linkedin_engine(user_id: str) -> LinkedInSearchEngine:
+    return LinkedInSearchEngine(user_id=user_id)
 
 
 def is_search_cancelled(search_id: str) -> bool:
@@ -193,7 +188,7 @@ async def _run_maps_search(
 async def _run_linkedin_search(
     supabase, search_id: str, user_id: str, keyword: str
 ) -> None:
-    engine = _get_linkedin_engine()
+    engine = _get_linkedin_engine(user_id)
 
     await _update_search(supabase, search_id, {
         "progress_percent": 10,

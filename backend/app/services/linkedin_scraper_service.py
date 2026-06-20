@@ -24,7 +24,9 @@ LINKEDIN_SEARCH_URL = (
     "?keywords={keyword}&sortBy=%22date%22&datePosted={time_filter}"
 )
 
-SESSION_FILE = Path("./sessions/linkedin_session.json")
+def _session_path(user_id: str = "") -> Path:
+    suffix = f"_{user_id}" if user_id else ""
+    return Path(f"./sessions/linkedin_session{suffix}.json")
 
 PROVIDER_PATTERNS = [
     "i built", "i developed", "i created", "i made", "i launched",
@@ -237,11 +239,12 @@ def _is_provider(text: str) -> bool:
     return any(p in t for p in PROVIDER_PATTERNS)
 
 
-def _load_session_cookies() -> list[dict] | None:
-    if not SESSION_FILE.exists():
+def _load_session_cookies(user_id: str = "") -> list[dict] | None:
+    session_file = _session_path(user_id)
+    if not session_file.exists():
         return None
     try:
-        with open(SESSION_FILE) as f:
+        with open(session_file) as f:
             data = json.load(f)
         raw = data.get("cookies", [])
         linkedin = [c for c in raw if "linkedin" in c.get("domain", "").lower()]
@@ -263,7 +266,7 @@ def _load_session_cookies() -> list[dict] | None:
             sanitized.append(c)
         return sanitized
     except Exception as e:
-        logger.warning(f"Cookie load error: {e}")
+        logger.warning(f"Cookie load error for user {user_id}: {e}")
         return None
 
 
@@ -319,7 +322,8 @@ def _extract_posts_from_dom(html: str) -> list[dict]:
 
 
 class LinkedInSearchEngine:
-    def __init__(self, timeout: int = 60000, max_retries: int = 2):
+    def __init__(self, user_id: str = "", timeout: int = 60000, max_retries: int = 2):
+        self.user_id = user_id
         self.timeout = timeout
         self.max_retries = max_retries
         self._session = None
@@ -344,7 +348,7 @@ class LinkedInSearchEngine:
     async def _get_session(self):
         from scrapling.fetchers.stealth_chrome import AsyncStealthySession
         if self._session is None:
-            cookies = _load_session_cookies()
+            cookies = _load_session_cookies(self.user_id)
             self._session = AsyncStealthySession(
                 headless=True,
                 block_ads=True,
@@ -682,4 +686,4 @@ class LinkedInSearchEngine:
             )
             self._warmed = True
         except Exception as e:
-            logger.warning(f"LinkedIn warmup failed: {e}")
+            logger.warning(f"LinkedIn warmup failed for user {self.user_id}: {e}")
