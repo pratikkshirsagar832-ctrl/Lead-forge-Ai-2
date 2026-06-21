@@ -24,7 +24,7 @@ export default function LandingPage() {
               whileHover={{ scale: 1.05 }}
               className="bg-gradient-to-br from-violet to-steel rounded-lg p-1 transition-transform duration-300 shadow-lg shadow-violet/20"
             >
-              <Image src="/hyperclients-logo.png" alt="Hyperclients" width={40} height={40} className="object-contain" />
+              <Image src="/hyperclients-icon.svg" alt="Hyperclients" width={40} height={40} className="object-contain" />
             </motion.div>
             <span className="font-bold text-xl tracking-tight text-offwhite" style={{ fontFamily: 'var(--font-heading)' }}>
               Hyperclients

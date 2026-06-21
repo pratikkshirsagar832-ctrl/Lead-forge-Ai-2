@@ -86,7 +86,7 @@ export default function LoginPage() {
       <GlassCard className="w-full max-w-md p-8 relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-gradient-to-br from-violet to-steel rounded-xl p-2 mb-4 shadow-lg shadow-violet/20">
-            <Image src="/hyperclients-logo.png" alt="Hyperclients" width={44} height={44} className="object-contain" />
+            <Image src="/hyperclients-icon.svg" alt="Hyperclients" width={44} height={44} className="object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-offwhite">Welcome to Hyperclients</h1>
           <p className="text-sm text-ice/60 mt-1">AI-powered lead generation</p>

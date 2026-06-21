@@ -32,7 +32,7 @@ export const LEAD_CATEGORIES = {
 } as const;
 
 export const USER_STATUSES = {
-  new: { label: 'New', color: '#6366F1' },
+  new: { label: 'New', color: '#2A35E0' },
   contacted: { label: 'Contacted', color: '#3B82F6' },
   replied: { label: 'Replied', color: '#10B981' },
   converted: { label: 'Converted', color: '#059669' },
@@ -40,7 +40,7 @@ export const USER_STATUSES = {
 } as const;
 
 export const SEARCH_STATUSES = {
-  queued: { label: 'Queued', color: '#6366F1' },
+  queued: { label: 'Queued', color: '#2A35E0' },
   scraping: { label: 'Scraping', color: '#F59E0B' },
   analyzing: { label: 'Analyzing', color: '#3B82F6' },
   completed: { label: 'Completed', color: '#10B981' },

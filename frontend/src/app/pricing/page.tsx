@@ -77,7 +77,7 @@ export default function PricingPage() {
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="bg-gradient-to-br from-violet to-steel rounded-lg p-1">
-              <Image src="/hyperclients-logo.png" alt="Hyperclients" width={28} height={28} className="object-contain" />
+              <Image src="/hyperclients-icon.svg" alt="Hyperclients" width={28} height={28} className="object-contain" />
             </div>
             <span className="font-bold text-lg text-offwhite">Hyperclients</span>
           </Link>

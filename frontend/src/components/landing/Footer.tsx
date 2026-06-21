@@ -13,7 +13,7 @@ export function Footer() {
           <div className="md:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-6 text-offwhite w-fit group">
               <div className="bg-gradient-to-br from-violet to-steel rounded-lg p-1 group-hover:scale-105 transition-transform duration-300 shadow-lg shadow-violet/20">
-                <Image src="/hyperclients-logo.png" alt="Hyperclients" width={40} height={40} className="object-contain" />
+                <Image src="/hyperclients-icon.svg" alt="Hyperclients" width={40} height={40} className="object-contain" />
               </div>
               <span className="font-bold text-xl tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>Hyperclients</span>
             </Link>
