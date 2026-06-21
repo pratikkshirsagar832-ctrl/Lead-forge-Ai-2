@@ -49,7 +49,7 @@ COPY Scrapling/ /tmp/Scrapling/
 RUN pip install --no-cache-dir /tmp/Scrapling/ && rm -rf /tmp/Scrapling/
 
 # Install Playwright browsers (needed by Scrapling)
-RUN python -m playwright install chromium --with-deps || echo "Playwright install failed (non-fatal)"
+RUN python -m playwright install chromium --with-deps 2>&1 && echo "Playwright install succeeded" || (echo "Playwright install failed - trying without deps" && python -m playwright install chromium 2>&1) || echo "Playwright install failed (non-fatal)"
 
 # Copy the built Go binary
 COPY --from=go-builder /google-maps-scraper /app/google-maps-scraper/google-maps-scraper

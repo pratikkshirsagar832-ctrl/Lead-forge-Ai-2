@@ -727,7 +727,39 @@ class LinkedInSearchEngine:
             self._session = None
 
     async def verify_session(self) -> bool:
-        """Quick check (~3s) if LinkedIn cookies are still valid."""
+        """Check if LinkedIn cookies are valid via httpx (fast, no browser needed)."""
+        cookies = _load_session_cookies(self.user_id)
+        if not cookies:
+            return False
+        try:
+            import httpx
+            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies if c.get("name") and c.get("value"))
+            async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
+                resp = await client.get(
+                    "https://www.linkedin.com/feed/",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                        "Cookie": cookie_str,
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    },
+                )
+                if resp.status_code in (302, 303, 307):
+                    loc = resp.headers.get("location", "")
+                    if any(x in loc.lower() for x in ("login", "/auth/", "signup")):
+                        logger.warning("LinkedIn session expired — redirected to login")
+                        return False
+                    return True
+                if resp.status_code < 400:
+                    logger.info("LinkedIn session verified — cookies are valid")
+                    return True
+                logger.warning(f"LinkedIn session check returned {resp.status_code}")
+                return False
+        except Exception as e:
+            logger.warning(f"LinkedIn session verify failed (httpx), falling back to browser: {e}")
+            return await self._verify_session_browser()
+
+    async def _verify_session_browser(self) -> bool:
+        """Fallback: check session using Scrapling browser (for servers with Playwright)."""
         session = await self._get_session()
         if session is None:
             return False
@@ -749,7 +781,7 @@ class LinkedInSearchEngine:
             logger.info("LinkedIn session verified — cookies are valid")
             return True
         except Exception as e:
-            logger.warning(f"LinkedIn session verify failed: {e}")
+            logger.warning(f"LinkedIn browser session verify failed: {e}")
             await self._cleanup()
             return False
 
