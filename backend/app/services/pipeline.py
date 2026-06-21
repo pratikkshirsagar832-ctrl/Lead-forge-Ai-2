@@ -112,6 +112,8 @@ async def load_more_linkedin_search(
             if len(new_leads) >= 10:
                 break
             raw = await engine.scrape_query(query, tf)
+            if raw is None:
+                return 0
             if not raw:
                 continue
             leads = await engine.ai_extract(raw, query, "all")
@@ -255,9 +257,12 @@ async def _run_linkedin_search(
         result = await engine.start_search(keyword, "latest", "all")
 
         if result.get("session_valid") is False:
+            msg = "LinkedIn cookies not found. Import your LinkedIn cookies from browser → paste them in Settings."
+            if result.get("timeout"):
+                msg = "LinkedIn search timed out. Try fewer queries or check network."
             await _update_search(supabase, search_id, {
                 "status": "failed",
-                "message": "LinkedIn session expired. Re-import cookies from LinkedIn → Settings → Data Privacy → Export, then paste here.",
+                "message": msg,
                 "error_message": "LinkedIn session expired",
                 "progress_percent": 0,
             })

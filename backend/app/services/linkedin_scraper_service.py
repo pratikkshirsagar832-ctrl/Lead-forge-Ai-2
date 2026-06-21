@@ -349,6 +349,9 @@ class LinkedInSearchEngine:
         from scrapling.fetchers.stealth_chrome import AsyncStealthySession
         if self._session is None:
             cookies = _load_session_cookies(self.user_id)
+            if not cookies:
+                logger.warning(f"No LinkedIn cookies found for user {self.user_id}")
+                return None
             self._session = AsyncStealthySession(
                 headless=True,
                 block_ads=True,
@@ -357,7 +360,12 @@ class LinkedInSearchEngine:
                 timeout=self.timeout,
                 solve_cloudflare=True,
             )
-            await self._session.start()
+            try:
+                await asyncio.wait_for(self._session.start(), timeout=30)
+            except asyncio.TimeoutError:
+                logger.error("LinkedIn session start timed out after 30s")
+                await self._cleanup()
+                return None
         return self._session
 
     def _build_url(self, keyword: str, time_filter: str) -> str:
@@ -411,9 +419,12 @@ class LinkedInSearchEngine:
 
     async def scrape_query(self, query: str, time_filter: str) -> list[dict] | None:
         url = self._build_url(query, time_filter)
+        session = await self._get_session()
+        if session is None:
+            return None
+
         for attempt in range(self.max_retries):
             try:
-                session = await self._get_session()
                 collected_urls = []
 
                 async def page_action(page, html=None):
@@ -437,16 +448,18 @@ class LinkedInSearchEngine:
                     except Exception:
                         pass
 
-                result = await session.fetch(
-                    url,
-                    load_dom=True,
-                    network_idle=False,
-                    wait=8000,
-                    page_action=page_action,
+                result = await asyncio.wait_for(
+                    session.fetch(
+                        url,
+                        load_dom=True,
+                        network_idle=False,
+                        wait=8000,
+                        page_action=page_action,
+                    ),
+                    timeout=30,
                 )
 
                 if not result or result.status >= 400:
-                    await asyncio.sleep(2)
                     continue
 
                 final_url = result.url.lower() if hasattr(result, 'url') else ""
@@ -468,12 +481,17 @@ class LinkedInSearchEngine:
                         rp["post_url"] = ""
                 return raw
 
+            except asyncio.TimeoutError:
+                logger.warning(f"LinkedIn fetch timed out for query '{query}' (attempt {attempt + 1})")
+                if attempt < self.max_retries - 1:
+                    continue
+                return None
             except Exception as e:
                 if attempt < self.max_retries - 1:
                     logger.warning(f"LinkedIn scrape attempt {attempt + 1} failed: {e}")
                     await asyncio.sleep(3)
                 else:
-                    logger.error(f"LinkedIn scrape failed after {self.max_retries} attempts: {e}", exc_info=True)
+                    logger.error(f"LinkedIn scrape failed after {self.max_retries} attempts: {e}")
                     return None
         return []
 
@@ -609,10 +627,22 @@ class LinkedInSearchEngine:
     async def start_search(
         self, topic: str, time_filter: str = "latest", lead_type: str = "all"
     ) -> dict:
+        try:
+            return await asyncio.wait_for(
+                self._start_search_internal(topic, time_filter, lead_type),
+                timeout=180,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"LinkedIn search timed out for topic '{topic}' after 180s")
+            await self._cleanup()
+            return {"leads": [], "has_more": False, "session_valid": False, "timeout": True}
+
+    async def _start_search_internal(
+        self, topic: str, time_filter: str = "latest", lead_type: str = "all"
+    ) -> dict:
         queries = await self.generate_queries(topic, lead_type)
         all_qualified: list[dict] = []
         seen_authors: set[str] = set()
-        any_session_valid = True
         MIN_TARGET = 10
         TIME_FILTERS = ["latest", "7_days", "14_days", "27_days", "2_months"]
 
@@ -624,9 +654,8 @@ class LinkedInSearchEngine:
                     break
                 raw = await self.scrape_query(query, tf)
                 if raw is None:
-                    logger.warning(f"LinkedIn scraper failed on query '{query}' — session may be invalid")
-                    any_session_valid = False
-                    continue
+                    logger.warning(f"LinkedIn scraper failed on query '{query}' ({tf}) — session invalid or no cookies")
+                    return {"leads": [], "has_more": False, "session_valid": False}
                 if not raw:
                     logger.info(f"Query '{query}' with filter '{tf}' returned 0 posts")
                     continue
@@ -639,8 +668,6 @@ class LinkedInSearchEngine:
                         all_qualified.append(lead)
                 logger.info(f"Query {i+1} '{query}' ({tf}): {len(leads)} qualified (total unique: {len(all_qualified)})")
 
-        if not any_session_valid:
-            return {"leads": [], "has_more": False, "session_valid": False}
         logger.info(f"LinkedIn search complete: {len(all_qualified)} unique qualified leads from topic '{topic}'")
         return {
             "leads": all_qualified[:10],
