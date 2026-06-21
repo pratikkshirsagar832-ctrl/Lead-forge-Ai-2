@@ -101,6 +101,10 @@ async def load_more_linkedin_search(
         if name:
             existing_authors.add(name)
 
+    if not await engine.verify_session():
+        logger.info(f"[Pipeline:{search_id}] LinkedIn session invalid — load-more skipped")
+        return 0
+
     queries = await engine.generate_queries(keyword, "all")
     new_leads: list[dict] = []
     TIME_FILTERS = ["latest", "7_days", "14_days", "27_days", "2_months"]

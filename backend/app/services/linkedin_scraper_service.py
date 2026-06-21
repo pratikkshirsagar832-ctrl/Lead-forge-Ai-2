@@ -640,6 +640,10 @@ class LinkedInSearchEngine:
     async def _start_search_internal(
         self, topic: str, time_filter: str = "latest", lead_type: str = "all"
     ) -> dict:
+        ok = await self.verify_session()
+        if not ok:
+            logger.warning("LinkedIn session invalid — skipping search")
+            return {"leads": [], "has_more": False, "session_valid": False}
         queries = await self.generate_queries(topic, lead_type)
         all_qualified: list[dict] = []
         seen_authors: set[str] = set()
@@ -722,11 +726,40 @@ class LinkedInSearchEngine:
                 pass
             self._session = None
 
+    async def verify_session(self) -> bool:
+        """Quick check (~3s) if LinkedIn cookies are still valid."""
+        session = await self._get_session()
+        if session is None:
+            return False
+        try:
+            result = await asyncio.wait_for(
+                session.fetch(
+                    "https://www.linkedin.com",
+                    load_dom=False,
+                    network_idle=False,
+                    wait=500,
+                ),
+                timeout=15,
+            )
+            final_url = result.url.lower() if hasattr(result, 'url') else ""
+            if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
+                await self._cleanup()
+                logger.warning("LinkedIn session check failed — redirected to login")
+                return False
+            logger.info("LinkedIn session verified — cookies are valid")
+            return True
+        except Exception as e:
+            logger.warning(f"LinkedIn session verify failed: {e}")
+            await self._cleanup()
+            return False
+
     async def warmup(self):
         if self._warmed:
             return
         try:
             session = await self._get_session()
+            if session is None:
+                return
             await session.fetch(
                 "https://www.linkedin.com",
                 load_dom=False,
