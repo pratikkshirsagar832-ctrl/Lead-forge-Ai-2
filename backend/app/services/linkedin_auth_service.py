@@ -1,6 +1,5 @@
-import asyncio
+import json
 import logging
-from json import dump, load
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class LinkedInSessionManager:
     def save_cookies(self, cookies: list[dict]) -> None:
         normalized = self._normalize_cookies(cookies)
         with open(self.session_file, "w") as f:
-            dump({"cookies": normalized}, f)
+            json.dump({"cookies": normalized}, f)
         logger.info(f"Saved {len(normalized)} LinkedIn cookies to {self.session_file}")
 
     def load_cookies(self) -> list[dict] | None:
@@ -32,7 +31,7 @@ class LinkedInSessionManager:
             return None
         try:
             with open(self.session_file) as f:
-                data = load(f)
+                data = json.load(f)
             raw = data.get("cookies", [])
             linkedin = [c for c in raw if "linkedin" in c.get("domain", "").lower()]
             if not linkedin:
@@ -65,107 +64,6 @@ class LinkedInSessionManager:
             return int(time.time() - mtime)
         except Exception:
             return None
-
-    async def login_flow(self, email: str, password: str) -> bool:
-        from patchright.sync_api import sync_playwright
-
-        logger.info("Logging into LinkedIn with headless browser...")
-
-        def _login():
-            with sync_playwright() as p:
-                browser = p.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-blink-features=AutomationControlled",
-                    ],
-                )
-                context = browser.new_context(
-                    viewport={"width": 1280, "height": 720},
-                    user_agent=(
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/148.0.0.0 Safari/537.36"
-                    ),
-                    locale="en-US",
-                    timezone_id="America/New_York",
-                )
-                page = context.new_page()
-
-                try:
-                    page.goto("https://www.linkedin.com/login", timeout=60000)
-                    page.wait_for_load_state("networkidle")
-                    logger.info(f"Login page loaded: {page.title()} — {page.url}")
-                except Exception as e:
-                    logger.error(f"Failed to load LinkedIn login page: {e}")
-                    try:
-                        logger.error(f"Page URL: {page.url}, title: {page.title()}")
-                        body_text = page.evaluate("document.body?.innerText?.slice(0, 500) || 'no body'")
-                        logger.error(f"Page content: {body_text}")
-                    except Exception:
-                        pass
-                    browser.close()
-                    return False
-
-                is_stealth = page.evaluate("navigator.webdriver")
-                logger.info(f"navigator.webdriver: {is_stealth}")
-
-                try:
-                    page.wait_for_selector("input[name='session_key']", timeout=15000)
-                    page.fill("input[name='session_key']", email)
-                    page.fill("input[name='session_password']", password)
-                except Exception:
-                    logger.warning("session_key selector failed, trying #username fallback...")
-                    try:
-                        body_text = page.evaluate("document.body?.innerText?.slice(0, 800) || 'no body'")
-                        logger.error(f"Page at failure: {page.url} — {body_text}")
-                    except Exception:
-                        pass
-                    page.wait_for_selector("#username", timeout=15000)
-                    page.fill("#username", email)
-                    page.fill("#password", password)
-
-                page.click("button[type=submit]")
-
-                try:
-                    page.wait_for_function(
-                        "() => document.cookie.includes('li_at=')",
-                        timeout=60000,
-                    )
-                    cookies = context.cookies()
-                    self.save_cookies([
-                        {"name": c["name"], "value": c["value"], "domain": c["domain"],
-                         "path": c.get("path", "/"), "httpOnly": c.get("httpOnly", False),
-                         "secure": c.get("secure", False), "sameSite": c.get("sameSite", "Lax")}
-                        for c in cookies
-                    ])
-                    browser.close()
-                    return True
-                except Exception as e:
-                    cookies = context.cookies()
-                    if any(c.get("name") == "li_at" for c in cookies):
-                        self.save_cookies([
-                            {"name": c["name"], "value": c["value"], "domain": c["domain"],
-                             "path": c.get("path", "/"), "httpOnly": c.get("httpOnly", False),
-                             "secure": c.get("secure", False), "sameSite": c.get("sameSite", "Lax")}
-                            for c in cookies
-                        ])
-                        browser.close()
-                        return True
-                    logger.error(f"LinkedIn login failed after submit: {e}")
-                    try:
-                        logger.error(f"Post-login URL: {page.url}")
-                        body_text = page.evaluate("document.body?.innerText?.slice(0, 800) || 'no body'")
-                        logger.error(f"Post-login content: {body_text}")
-                    except Exception:
-                        pass
-                    browser.close()
-                    return False
-
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, _login)
-        return result
 
     @staticmethod
     def _normalize_cookies(cookies: list[dict]) -> list[dict]:

@@ -1,7 +1,7 @@
-import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.middleware.auth_middleware import get_current_user
 from app.services.linkedin_auth_service import LinkedInSessionManager
@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn"])
 
 _session_managers: dict[str, LinkedInSessionManager] = {}
-_login_tasks: dict[str, asyncio.Task] = {}
 
 
 def _get_session_manager(user_id: str) -> LinkedInSessionManager:
@@ -45,9 +44,6 @@ async def session_info(current_user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-from pydantic import BaseModel
 
 
 class CookieImportRequest(BaseModel):
@@ -106,42 +102,6 @@ async def session_logout(current_user: dict = Depends(get_current_user)):
         if mgr.session_file.exists():
             mgr.session_file.unlink()
         _session_managers.pop(current_user["id"], None)
-        _login_tasks.pop(current_user["id"], None)
         return {"success": True, "message": "Logged out of LinkedIn session."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-@router.post("/session/login")
-async def session_login(req: LoginRequest, current_user: dict = Depends(get_current_user)):
-    user_id = current_user["id"]
-    existing_task = _login_tasks.get(user_id)
-    if existing_task and not existing_task.done():
-        return {"success": False, "message": "Login already in progress"}
-
-    mgr = _get_session_manager(user_id)
-
-    async def run_login():
-        return await mgr.login_flow(req.email, req.password)
-
-    _login_tasks[user_id] = asyncio.create_task(run_login())
-    return {"success": True, "message": "Login started. Check status at GET /api/linkedin/session/login-status"}
-
-
-@router.get("/session/login-status")
-async def session_login_status(current_user: dict = Depends(get_current_user)):
-    task = _login_tasks.get(current_user["id"])
-    if not task:
-        return {"running": False, "done": False, "success": None}
-    if task.done():
-        try:
-            result = task.result()
-            return {"running": False, "done": True, "success": result}
-        except Exception as e:
-            return {"running": False, "done": True, "success": False, "error": str(e)}
-    return {"running": True, "done": False, "success": None}

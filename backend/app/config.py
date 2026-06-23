@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     gmaps_scraper_path: str = "backend/google-maps-scraper/google-maps-scraper"
 
+    scrapling_proxy: str = ""
+    scrapling_solve_cloudflare: bool = True
+    scrapling_headless: bool = True
+
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
     site_url: str = "http://localhost:3000"

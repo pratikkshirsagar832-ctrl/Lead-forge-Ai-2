@@ -15,12 +15,11 @@ RUN go mod download && \
 # ── Stage 2: Python application ──
 FROM python:3.12-slim-bookworm
 
-# Install system dependencies for Patchright/Playwright
+# Install system dependencies for Scrapling (Playwright/Patchright Chromium)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     wget \
-    gnupg \
     ca-certificates \
     libnss3 \
     libatk-bridge2.0-0 \
@@ -40,12 +39,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy and install Python dependencies
+# Copy and install Python dependencies (includes scrapling[all])
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Chromium for Patchright (patched Playwright — different browser builds/paths)
-RUN patchright install chromium --with-deps 2>&1 && echo "Patchright Chromium OK" || (patchright install chromium 2>&1 && echo "Patchright Chromium OK (no-deps)") || echo "Patchright Chromium FAILED (non-fatal)"
+# Install Playwright system deps and Chromium browser (for Scrapling's StealthyFetcher which uses Patchright)
+RUN pip install patchright --upgrade 2>&1 && \
+    python -m patchright install chromium --with-deps 2>&1 && \
+    echo "Patchright Chromium installed"
 
 # Copy the built Go binary
 COPY --from=go-builder /google-maps-scraper /app/google-maps-scraper/google-maps-scraper
