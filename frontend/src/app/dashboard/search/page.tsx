@@ -11,6 +11,7 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
+import { LinkedInLoginForm } from '@/components/dashboard/LinkedInLoginForm';
 import { UpgradeModal } from '@/components/shared/UpgradeModal';
 import { API_ROUTES } from '@/lib/constants';
 import { useSearchStore } from '@/stores/searchStore';
@@ -224,6 +225,7 @@ export default function SearchPage() {
   const [linkedinLeadType, setLinkedinLeadType] = useState<LinkedInLeadType>('all');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [linkedinSessionOk, setLinkedinSessionOk] = useState(false);
 
   const mapsForm = useForm({ resolver: zodResolver(mapsSchema) });
 
@@ -272,6 +274,20 @@ export default function SearchPage() {
       setIsLoadingMore(false);
     }
   }, [activeSearchId, isLoadingMore]);
+
+  const checkLinkedInSession = useCallback(async () => {
+    if (source !== 'linkedin') return;
+    try {
+      const { data } = await api.get('/api/linkedin/session/status');
+      setLinkedinSessionOk(!!data.logged_in);
+    } catch {
+      setLinkedinSessionOk(false);
+    }
+  }, [source]);
+
+  useEffect(() => {
+    checkLinkedInSession();
+  }, [checkLinkedInSession]);
 
   const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
 
@@ -388,8 +404,29 @@ export default function SearchPage() {
                   <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
                 </form>
               </div>
+            ) : !linkedinSessionOk ? (
+              <LinkedInLoginForm onLoggedIn={() => { setLinkedinSessionOk(true); }} />
             ) : (
               <div className="glass-card-premium rounded-2xl p-8 max-w-3xl mx-auto border-accent-cyan/10">
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-ocean/20">
+                  <div className="flex items-center gap-2">
+                    <Linkedin className="w-5 h-5 text-accent-cyan" />
+                    <span className="text-sm font-semibold text-ice/70">LinkedIn</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Session Active</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.post('/api/linkedin/session/logout');
+                        setLinkedinSessionOk(false);
+                      } catch {}
+                    }}
+                    className="text-[11px] text-ice/40 hover:text-rose-400 transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </div>
                 <form onSubmit={(e) => { e.preventDefault(); onSubmitLinkedin(); }} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
