@@ -6,8 +6,7 @@ pydantic[email]==2.10.5
 pydantic-settings==2.7.1
 python-multipart==0.0.20
 python-dotenv==1.0.1
-scrapling==0.2.99
-curl-cffi==0.7.3
+lxml>=5.0.0
 razorpay==2.0.1
 openai>=1.0.0
 patchright>=0.10.0

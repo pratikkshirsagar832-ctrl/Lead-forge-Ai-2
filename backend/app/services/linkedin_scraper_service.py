@@ -28,6 +28,9 @@ def _session_path(user_id: str = "") -> Path:
     suffix = f"_{user_id}" if user_id else ""
     return Path(f"./sessions/linkedin_session{suffix}.json")
 
+def _global_session_path() -> Path:
+    return Path("./sessions/linkedin_session.json")
+
 PROVIDER_PATTERNS = [
     "i built", "i developed", "i created", "i made", "i launched",
     "i offer", "i provide", "i specialize", "i help",
@@ -242,7 +245,12 @@ def _is_provider(text: str) -> bool:
 def _load_session_cookies(user_id: str = "") -> list[dict] | None:
     session_file = _session_path(user_id)
     if not session_file.exists():
-        return None
+        global_file = _global_session_path()
+        if global_file.exists():
+            session_file = global_file
+        else:
+            logger.warning(f"No LinkedIn cookie file found for user {user_id}")
+            return None
     try:
         with open(session_file) as f:
             data = json.load(f)
@@ -271,53 +279,56 @@ def _load_session_cookies(user_id: str = "") -> list[dict] | None:
 
 
 def _extract_posts_from_dom(html: str) -> list[dict]:
-    from scrapling.parser import Selector
     posts = []
     if not html:
         return posts
-    sel = Selector(content=html)
-    items = sel.css('div[role="listitem"]')
-    if not items or len(items) == 0:
-        items = sel.css(
-            "div.feed-shared-update-v2, li.search-result, article.search-result"
-        )
-    for item in items:
-        try:
-            text = item.get_all_text(strip=True)
-            if not text or len(text) < 30:
+    try:
+        from lxml import html as lxml_html
+        tree = lxml_html.fromstring(html)
+        items = tree.cssselect('div[role="listitem"]')
+        if not items:
+            items = tree.cssselect(
+                "div.feed-shared-update-v2, li.search-result, article.search-result"
+            )
+        for item in items:
+            try:
+                text = item.text_content().strip()
+                if not text or len(text) < 30:
+                    continue
+                profile_link = ""
+                for pattern in ("/in/", "/company/", "/school/", "/showcase/"):
+                    link_el = item.cssselect(f'a[href*="{pattern}"]')
+                    if link_el:
+                        href = link_el[0].get("href", "")
+                        if href.startswith("//"):
+                            href = "https:" + href
+                        elif href.startswith("/"):
+                            href = "https://www.linkedin.com" + href
+                        profile_link = href
+                        break
+                if not profile_link:
+                    any_link = item.cssselect('a[href*="linkedin.com"]')
+                    if any_link:
+                        href = any_link[0].get("href", "")
+                        profile_link = href if href.startswith("http") else ""
+
+                author_name = "LinkedIn User"
+                if profile_link:
+                    name_tag = item.cssselect('span[dir="ltr"]')
+                    if name_tag:
+                        name_text = name_tag[0].text_content().strip()
+                        if name_text and len(name_text) < 60:
+                            author_name = name_text
+
+                posts.append({
+                    "author_name": author_name,
+                    "author_profile": profile_link,
+                    "raw_text": text,
+                })
+            except Exception:
                 continue
-            profile_link = ""
-            for pattern in ("/in/", "/company/", "/school/", "/showcase/"):
-                link_el = item.css(f'a[href*="{pattern}"]').first
-                if link_el:
-                    href = link_el.attrib.get("href", "")
-                    if href.startswith("//"):
-                        href = "https:" + href
-                    elif href.startswith("/"):
-                        href = "https://www.linkedin.com" + href
-                    profile_link = href
-                    break
-            if not profile_link:
-                any_link = item.css('a[href*="linkedin.com"]').first
-                if any_link:
-                    href = any_link.attrib.get("href", "")
-                    profile_link = href if href.startswith("http") else ""
-
-            author_name = "LinkedIn User"
-            if profile_link:
-                name_tag = item.css('span[dir="ltr"]').first
-                if name_tag:
-                    name_text = name_tag.get_all_text(strip=True)
-                    if name_text and len(name_text) < 60:
-                        author_name = name_text
-
-            posts.append({
-                "author_name": author_name,
-                "author_profile": profile_link,
-                "raw_text": text,
-            })
-        except Exception:
-            continue
+    except Exception:
+        pass
     return posts
 
 
@@ -326,7 +337,10 @@ class LinkedInSearchEngine:
         self.user_id = user_id
         self.timeout = timeout
         self.max_retries = max_retries
-        self._session = None
+        self._playwright = None
+        self._browser = None
+        self._context = None
+        self._page = None
         self._ai_client = None
         self._warmed = False
 
@@ -345,28 +359,42 @@ class LinkedInSearchEngine:
             logger.warning(f"Failed to initialize OpenAI client: {e}")
             return None
 
-    async def _get_session(self):
-        from scrapling.fetchers.stealth_chrome import AsyncStealthySession
-        if self._session is None:
+    async def _get_page(self):
+        from patchright.async_api import async_playwright
+        if self._page is None:
             cookies = _load_session_cookies(self.user_id)
             if not cookies:
                 logger.warning(f"No LinkedIn cookies found for user {self.user_id}")
                 return None
-            self._session = AsyncStealthySession(
-                headless=True,
-                block_ads=True,
-                disable_resources=True,
-                cookies=cookies,
-                timeout=self.timeout,
-                solve_cloudflare=True,
-            )
             try:
-                await asyncio.wait_for(self._session.start(), timeout=30)
+                self._playwright = await async_playwright().__aenter__()
+                self._browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-dev-shm-usage",
+                    ],
+                )
+                self._context = await self._browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                    viewport={"width": 1920, "height": 1080},
+                    no_viewport=True,
+                )
+                await asyncio.wait_for(
+                    self._context.add_cookies(cookies),
+                    timeout=30,
+                )
+                self._page = await self._context.new_page()
             except asyncio.TimeoutError:
-                logger.error("LinkedIn session start timed out after 30s")
+                logger.error("LinkedIn page context creation timed out after 30s")
                 await self._cleanup()
                 return None
-        return self._session
+            except Exception as e:
+                logger.error(f"Failed to create Patchright page: {e}")
+                await self._cleanup()
+                return None
+        return self._page
 
     def _build_url(self, keyword: str, time_filter: str) -> str:
         tf = TIME_FILTER_MAP.get(time_filter, TIME_FILTER_MAP["latest"])
@@ -419,59 +447,44 @@ class LinkedInSearchEngine:
 
     async def scrape_query(self, query: str, time_filter: str) -> list[dict] | None:
         url = self._build_url(query, time_filter)
-        session = await self._get_session()
-        if session is None:
+        page = await self._get_page()
+        if page is None:
             return None
 
         for attempt in range(self.max_retries):
             try:
-                collected_urls = []
-
-                async def page_action(page, html=None):
-                    try:
-                        urls = await page.evaluate(r"""() => {
-                            const results = [];
-                            const seen = new Set();
-                            const walker = document.createTreeWalker(document.body, 1, null, false);
-                            while (walker.nextNode()) {
-                                const el = walker.currentNode;
-                                const attr = el.getAttribute('data-urn') || el.getAttribute('data-id') || '';
-                                const m = attr.match(/urn:li:activity:(\d+)/);
-                                if (m && !seen.has(m[0])) {
-                                    seen.add(m[0]);
-                                    results.push('https://www.linkedin.com/feed/update/' + m[0] + '/');
-                                }
-                            }
-                            return results;
-                        }""")
-                        collected_urls.extend(urls if isinstance(urls, list) else [])
-                    except Exception:
-                        pass
-
-                result = await asyncio.wait_for(
-                    session.fetch(
-                        url,
-                        load_dom=True,
-                        network_idle=False,
-                        wait=8000,
-                        page_action=page_action,
-                    ),
+                resp = await asyncio.wait_for(
+                    page.goto(url, wait_until="domcontentloaded"),
                     timeout=30,
                 )
 
-                if not result or result.status >= 400:
+                if resp and resp.status >= 400:
                     continue
 
-                final_url = result.url.lower() if hasattr(result, 'url') else ""
+                final_url = page.url.lower()
                 if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge")):
                     await self._cleanup()
                     return None
 
-                html = (
-                    result.html_content
-                    if hasattr(result, 'html_content')
-                    else result.body.decode()
-                )
+                await page.wait_for_timeout(5000)
+
+                html = await page.content()
+
+                collected_urls = await page.evaluate("""() => {
+                    const results = [];
+                    const seen = new Set();
+                    const walker = document.createTreeWalker(document.body, 1, null, false);
+                    while (walker.nextNode()) {
+                        const el = walker.currentNode;
+                        const attr = el.getAttribute('data-urn') || el.getAttribute('data-id') || '';
+                        const m = attr.match(/urn:li:activity:(\\d+)/);
+                        if (m && !seen.has(m[0])) {
+                            seen.add(m[0]);
+                            results.push('https://www.linkedin.com/feed/update/' + m[0] + '/');
+                        }
+                    }
+                    return results;
+                }""")
 
                 raw = _extract_posts_from_dom(html)
                 for i, rp in enumerate(raw):
@@ -719,12 +732,25 @@ class LinkedInSearchEngine:
         return saved_ids
 
     async def _cleanup(self):
-        if self._session:
+        self._page = None
+        if self._context:
             try:
-                await self._session.close()
+                await self._context.close()
             except Exception:
                 pass
-            self._session = None
+            self._context = None
+        if self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        if self._playwright:
+            try:
+                await self._playwright.__aexit__(None, None, None)
+            except Exception:
+                pass
+            self._playwright = None
 
     async def verify_session(self) -> bool:
         """Check if LinkedIn cookies are valid via httpx (fast, no browser needed)."""
@@ -759,21 +785,16 @@ class LinkedInSearchEngine:
             return await self._verify_session_browser()
 
     async def _verify_session_browser(self) -> bool:
-        """Fallback: check session using Scrapling browser (for servers with Playwright)."""
-        session = await self._get_session()
-        if session is None:
+        """Fallback: check session using Patchright browser."""
+        page = await self._get_page()
+        if page is None:
             return False
         try:
-            result = await asyncio.wait_for(
-                session.fetch(
-                    "https://www.linkedin.com",
-                    load_dom=False,
-                    network_idle=False,
-                    wait=500,
-                ),
+            await asyncio.wait_for(
+                page.goto("https://www.linkedin.com", wait_until="domcontentloaded"),
                 timeout=15,
             )
-            final_url = result.url.lower() if hasattr(result, 'url') else ""
+            final_url = page.url.lower()
             if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
                 await self._cleanup()
                 logger.warning("LinkedIn session check failed — redirected to login")
@@ -789,15 +810,10 @@ class LinkedInSearchEngine:
         if self._warmed:
             return
         try:
-            session = await self._get_session()
-            if session is None:
+            page = await self._get_page()
+            if page is None:
                 return
-            await session.fetch(
-                "https://www.linkedin.com",
-                load_dom=False,
-                network_idle=False,
-                wait=500,
-            )
+            await page.goto("https://www.linkedin.com", wait_until="domcontentloaded", timeout=10000)
             self._warmed = True
         except Exception as e:
             logger.warning(f"LinkedIn warmup failed for user {self.user_id}: {e}")
