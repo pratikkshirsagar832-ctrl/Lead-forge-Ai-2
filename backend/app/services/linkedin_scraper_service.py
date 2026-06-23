@@ -1,4 +1,5 @@
 import asyncio
+import httpx
 import json
 import logging
 import re
@@ -235,92 +236,7 @@ def _is_provider(text: str) -> bool:
     return any(p in t for p in PROVIDER_PATTERNS)
 
 
-POST_EXTRACTION_JS = """
-() => {
-    const posts = [];
-    const seen = new Set();
-    const html = document.body.innerHTML;
 
-    const urnMatches = html.matchAll(/urn:li:activity:(\\d+)/g);
-    for (const match of urnMatches) {
-        const fullUrn = match[0];
-        if (seen.has(fullUrn)) continue;
-        seen.add(fullUrn);
-
-        const el = document.querySelector(`[data-urn="${fullUrn}"]`);
-        if (!el) continue;
-
-        let text = '';
-        const textSelectors = [
-            '.update-components-text',
-            '.feed-shared-update-v2__description',
-            '.feed-shared-text',
-            '.break-words',
-        ];
-        for (const sel of textSelectors) {
-            const textEl = el.querySelector(sel);
-            if (textEl) {
-                const t = textEl.innerText?.trim() || '';
-                if (t.length > text.length && t.length > 20) text = t;
-            }
-        }
-
-        if (!text || text.length < 20) {
-            const allDivs = el.querySelectorAll('div, span');
-            let maxLen = 0;
-            allDivs.forEach(div => {
-                const t = div.innerText?.trim() || '';
-                if (t.length > maxLen && t.length > 50 &&
-                    !t.includes('followers') && !t.match(/^\\d+[hdwmy]\\s/)) {
-                    const parent = div.parentElement;
-                    if (parent && !parent.classList.contains('feed-shared-actor')) {
-                        text = t; maxLen = t.length;
-                    }
-                }
-            });
-        }
-
-        if (!text || text.length < 20) continue;
-
-        const authorEl = el.querySelector(
-            '[class*="actor__name"], [class*="update-components-actor__name"], [class*="hoverable-link-text"]'
-        );
-        const author = authorEl ? authorEl.innerText.trim() : '';
-
-        const timeEl = el.querySelector(
-            '[class*="actor__sub-description"], [class*="update-components-actor__sub-description"]'
-        );
-        const timeText = timeEl ? timeEl.innerText.split('•')[0].trim() : '';
-
-        const reactEl = el.querySelector(
-            'button[aria-label*="reaction"], [class*="social-details-social-counts__reactions"]'
-        );
-        const reactions = reactEl ? reactEl.innerText.trim() : '';
-
-        const commEl = el.querySelector('button[aria-label*="comment"]');
-        const comments = commEl ? commEl.innerText.trim() : '';
-
-        const profileLink = '';
-        const linkEl = el.querySelector('a[href*="/in/"], a[href*="/company/"]');
-        if (linkEl) {
-            let href = linkEl.getAttribute('href') || '';
-            if (href.startsWith('//')) href = 'https:' + href;
-            else if (href.startsWith('/')) href = 'https://www.linkedin.com' + href;
-        }
-
-        posts.push({
-            urn: fullUrn,
-            author: author,
-            text: text.substring(0, 2000),
-            timeText: timeText,
-            reactions: reactions,
-            comments: comments,
-            profileLink: profileLink,
-        });
-    }
-    return posts;
-}
-"""
 
 
 class LinkedInSearchEngine:
@@ -328,7 +244,8 @@ class LinkedInSearchEngine:
         self.user_id = user_id
         self.timeout = timeout
         self.max_retries = max_retries
-        self._session = None
+        self._client = None
+        self._cookie_str = None
         self._ai_client = None
         self._session_mgr = LinkedInSessionManager(user_id=user_id)
 
@@ -347,8 +264,8 @@ class LinkedInSearchEngine:
             logger.warning(f"Failed to initialize OpenAI client: {e}")
             return None
 
-    async def _ensure_browser(self) -> bool:
-        if self._session is not None:
+    async def _ensure_http(self) -> bool:
+        if self._client is not None:
             return True
 
         cookies = self._session_mgr.load_cookies()
@@ -362,35 +279,23 @@ class LinkedInSearchEngine:
             return False
 
         try:
-            from scrapling.fetchers import AsyncStealthySession
-
-            self._session = AsyncStealthySession(
-                headless=True,
-                solve_cloudflare=True,
-                block_webrtc=True,
-                hide_canvas=True,
-                timeout=self.timeout,
-                cookies=cookies,
+            timeout_secs = max(10, self.timeout // 1000) if self.timeout else 30
+            transport = httpx.AsyncHTTPTransport(retries=2)
+            self._client = httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout_secs, connect=15.0),
+                transport=transport,
+                follow_redirects=True,
+                max_redirects=5,
             )
-            await self._session.__aenter__()
-
-            resp = await self._session.fetch(
-                "https://www.linkedin.com/feed/",
-                load_dom=True,
-                timeout=30000,
+            self._cookie_str = "; ".join(
+                f"{c['name']}={c['value']}"
+                for c in cookies
+                if c.get("name") and c.get("value")
             )
-
-            final_url = resp.url.lower()
-            if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
-                logger.warning("LinkedIn session invalid after cookie import")
-                await self._cleanup()
-                return False
-
-            logger.info("LinkedIn browser ready with valid session (Scrapling StealthyFetcher)")
+            logger.info("HTTPX session initialized for LinkedIn scraping")
             return True
         except Exception as e:
-            logger.error(f"Failed to start LinkedIn stealth browser: {e}")
-            await self._cleanup()
+            logger.error(f"Failed to initialize HTTPX session: {e}")
             return False
 
     def _build_url(self, keyword: str, time_filter: str) -> str:
@@ -443,7 +348,7 @@ class LinkedInSearchEngine:
         return [topic] * 10
 
     async def scrape_query(self, query: str, time_filter: str) -> list[dict] | None:
-        ok = await self._ensure_browser()
+        ok = await self._ensure_http()
         if not ok:
             return None
 
@@ -451,43 +356,22 @@ class LinkedInSearchEngine:
 
         for attempt in range(self.max_retries):
             try:
-                extracted_posts = []
-
-                async def scroll_and_extract(page):
-                    for _ in range(5):
-                        try:
-                            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                            await asyncio.sleep(1.5)
-                        except Exception:
-                            break
-
-                    try:
-                        posts = await page.evaluate(POST_EXTRACTION_JS)
-                        if posts and isinstance(posts, list):
-                            extracted_posts.extend(posts)
-                    except Exception as e:
-                        logger.warning(f"JS extraction error: {e}")
-
-                resp = await self._session.fetch(
+                resp = await self._client.get(
                     url,
-                    network_idle=True,
-                    load_dom=True,
-                    page_action=scroll_and_extract,
-                    solve_cloudflare=True,
-                    timeout=self.timeout,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Accept-Language": "en-US,en;q=0.9",
+                        "Cookie": self._cookie_str,
+                    },
                 )
 
-                final_url = resp.url.lower()
+                final_url = str(resp.url).lower()
                 if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
-                    logger.warning("Session invalid during scrape")
-                    await self._cleanup()
+                    logger.warning("Session invalid during scrape — redirected to login")
                     return None
 
-                if extracted_posts:
-                    logger.info(f"JS extracted {len(extracted_posts)} posts for query '{query}'")
-                    return extracted_posts
-
-                html = resp.content.decode("utf-8", errors="replace")
+                html = resp.text
                 posts_from_html = self._extract_posts_from_html(html)
                 if posts_from_html:
                     logger.info(f"HTML extracted {len(posts_from_html)} posts for query '{query}'")
@@ -496,7 +380,7 @@ class LinkedInSearchEngine:
                 logger.info(f"Query '{query}' with filter '{time_filter}' returned 0 posts")
                 return []
 
-            except asyncio.TimeoutError:
+            except httpx.TimeoutException:
                 logger.warning(f"LinkedIn fetch timed out for query '{query}' (attempt {attempt + 1})")
                 if attempt < self.max_retries - 1:
                     continue
@@ -778,21 +662,21 @@ class LinkedInSearchEngine:
         return saved_ids
 
     async def _cleanup(self):
-        if self._session is not None:
+        if self._client is not None:
             try:
-                await self._session.close()
+                await self._client.aclose()
             except Exception:
                 pass
-            self._session = None
+            self._client = None
+            self._cookie_str = None
 
     async def verify_session(self) -> bool:
         cookies = self._session_mgr.load_cookies()
         if not cookies:
             return False
         try:
-            import httpx
             cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies if c.get("name") and c.get("value"))
-            async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True, max_redirects=5) as client:
                 resp = await client.get(
                     "https://www.linkedin.com/feed/",
                     headers={
@@ -801,20 +685,22 @@ class LinkedInSearchEngine:
                         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     },
                 )
-                if resp.status_code in (302, 303, 307):
-                    loc = resp.headers.get("location", "")
-                    if any(x in loc.lower() for x in ("login", "/auth/", "signup")):
-                        logger.warning("LinkedIn session expired — redirected to login")
-                        return False
-                    return True
-                if resp.status_code < 400:
-                    logger.info("LinkedIn session verified — cookies are valid")
-                    return True
-                logger.warning(f"LinkedIn session check returned {resp.status_code}")
-                return False
+                final_url = str(resp.url).lower()
+                if any(x in final_url for x in ("login", "/auth/", "signup", "checkpoint", "challenge", "uas/")):
+                    logger.warning("LinkedIn session invalid — final URL is login page")
+                    return False
+                logger.info("LinkedIn session verified — cookies are valid")
+                return True
+        except httpx.TooManyRedirects:
+            logger.warning("LinkedIn session check had too many redirects — session likely invalid")
+            return False
         except Exception as e:
-            logger.warning(f"LinkedIn session verify failed (httpx), falling back to browser: {e}")
+            logger.warning(f"LinkedIn session verify failed: {e}")
             return False
 
     async def warmup(self):
-        pass
+        valid = await self.verify_session()
+        if valid:
+            logger.info("LinkedIn session found on startup")
+        else:
+            logger.info("No valid LinkedIn session on startup — waiting for cookie import")
