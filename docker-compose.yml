@@ -9,6 +9,8 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    volumes:
+      - ./backend/sessions:/app/sessions
     environment:
       - ENVIRONMENT=production
       - GMAPS_SCRAPER_PATH=/app/google-maps-scraper/google-maps-scraper
