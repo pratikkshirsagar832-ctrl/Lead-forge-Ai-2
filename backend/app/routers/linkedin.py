@@ -66,8 +66,11 @@ SAMESITE_MAP = {
 def _sanitize_cookies(cookies: list[dict]) -> list[dict]:
     sanitized = []
     for c in cookies:
-        allowed = {"name", "value", "domain", "path", "httpOnly", "secure", "sameSite"}
-        entry = {k: v for k, v in c.items() if k in allowed}
+        entry = dict(c)
+        if "expirationDate" in entry and "expires" not in entry:
+            entry["expires"] = int(entry.pop("expirationDate"))
+        if "expires" in entry and isinstance(entry["expires"], float):
+            entry["expires"] = int(entry["expires"])
         ss = entry.get("sameSite", "")
         if ss and ss.lower() in SAMESITE_MAP:
             entry["sameSite"] = SAMESITE_MAP[ss.lower()]

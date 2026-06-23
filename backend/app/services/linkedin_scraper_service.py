@@ -1,13 +1,16 @@
 import asyncio
 import json
 import logging
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 from app.config import get_settings
 from app.database import get_supabase_admin
+
+from linkedin_mcp_server.core.browser import BrowserManager
+from linkedin_mcp_server.scraping.extractor import LinkedInExtractor
+
+from app.services.linkedin_auth_service import LinkedInSessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +26,6 @@ LINKEDIN_SEARCH_URL = (
     "https://www.linkedin.com/search/results/content/"
     "?keywords={keyword}&sortBy=%22date%22&datePosted={time_filter}"
 )
-
-def _session_path(user_id: str = "") -> Path:
-    suffix = f"_{user_id}" if user_id else ""
-    return Path(f"./sessions/linkedin_session{suffix}.json")
-
-def _global_session_path() -> Path:
-    return Path("./sessions/linkedin_session.json")
 
 PROVIDER_PATTERNS = [
     "i built", "i developed", "i created", "i made", "i launched",
@@ -242,42 +238,6 @@ def _is_provider(text: str) -> bool:
     return any(p in t for p in PROVIDER_PATTERNS)
 
 
-def _load_session_cookies(user_id: str = "") -> list[dict] | None:
-    session_file = _session_path(user_id)
-    if not session_file.exists():
-        global_file = _global_session_path()
-        if global_file.exists():
-            session_file = global_file
-        else:
-            logger.warning(f"No LinkedIn cookie file found for user {user_id}")
-            return None
-    try:
-        with open(session_file) as f:
-            data = json.load(f)
-        raw = data.get("cookies", [])
-        linkedin = [c for c in raw if "linkedin" in c.get("domain", "").lower()]
-        if not linkedin:
-            return None
-        allowed = {"name", "value", "domain", "path", "expires", "httpOnly", "secure", "sameSite"}
-        sanitized = []
-        samesite_map = {
-            "no_restriction": "None", "unspecified": "Lax",
-            "none": "None", "lax": "Lax", "strict": "Strict",
-        }
-        for c in linkedin:
-            c = {k: v for k, v in c.items() if k in allowed and v is not None}
-            ss = c.get("sameSite", "")
-            if ss and ss.lower() in samesite_map:
-                c["sameSite"] = samesite_map[ss.lower()]
-            elif not ss or ss.lower() not in ("lax", "strict", "none"):
-                c["sameSite"] = "Lax"
-            sanitized.append(c)
-        return sanitized
-    except Exception as e:
-        logger.warning(f"Cookie load error for user {user_id}: {e}")
-        return None
-
-
 def _extract_posts_from_dom(html: str) -> list[dict]:
     posts = []
     if not html:
@@ -337,12 +297,11 @@ class LinkedInSearchEngine:
         self.user_id = user_id
         self.timeout = timeout
         self.max_retries = max_retries
-        self._playwright = None
-        self._browser = None
-        self._context = None
-        self._page = None
+        self._browser: BrowserManager | None = None
+        self._extractor: LinkedInExtractor | None = None
         self._ai_client = None
         self._warmed = False
+        self._session_mgr = LinkedInSessionManager(user_id=user_id)
 
     async def _get_ai_client(self):
         if self._ai_client is not None:
@@ -359,42 +318,50 @@ class LinkedInSearchEngine:
             logger.warning(f"Failed to initialize OpenAI client: {e}")
             return None
 
-    async def _get_page(self):
-        from patchright.async_api import async_playwright
-        if self._page is None:
-            cookies = _load_session_cookies(self.user_id)
-            if not cookies:
-                logger.warning(f"No LinkedIn cookies found for user {self.user_id}")
-                return None
-            try:
-                self._playwright = await async_playwright().__aenter__()
-                self._browser = await self._playwright.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-blink-features=AutomationControlled",
-                        "--disable-dev-shm-usage",
-                    ],
-                )
-                self._context = await self._browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    no_viewport=True,
-                )
-                await asyncio.wait_for(
-                    self._context.add_cookies(cookies),
-                    timeout=30,
-                )
-                self._page = await self._context.new_page()
-            except asyncio.TimeoutError:
-                logger.error("LinkedIn page context creation timed out after 30s")
+    async def _ensure_browser(self) -> bool:
+        if self._browser is not None:
+            return True
+
+        cookies = self._session_mgr.load_cookies()
+        if not cookies:
+            logger.warning(f"No LinkedIn cookies found for user {self.user_id}")
+            return False
+
+        has_li_at = any(c.get("name") == "li_at" for c in cookies)
+        if not has_li_at:
+            logger.warning("No li_at cookie found")
+            return False
+
+        try:
+            self._browser = BrowserManager(
+                headless=True,
+                slow_mo=0,
+                viewport={"width": 1920, "height": 1080},
+            )
+            await self._browser.start()
+
+            linkedin_cookies = [c for c in cookies if "linkedin" in c.get("domain", "").lower()]
+            await self._browser.context.add_cookies(linkedin_cookies)
+            logger.info(f"Added {len(linkedin_cookies)} LinkedIn cookies to persistent context")
+
+            await self._browser.page.goto(
+                "https://www.linkedin.com/feed/",
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
+            final_url = self._browser.page.url.lower()
+            if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
+                logger.warning("LinkedIn session invalid after cookie import")
                 await self._cleanup()
-                return None
-            except Exception as e:
-                logger.error(f"Failed to create Patchright page: {e}")
-                await self._cleanup()
-                return None
-        return self._page
+                return False
+
+            self._extractor = LinkedInExtractor(self._browser.page)
+            logger.info("LinkedIn browser ready with valid session")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to start LinkedIn browser: {e}")
+            await self._cleanup()
+            return False
 
     def _build_url(self, keyword: str, time_filter: str) -> str:
         tf = TIME_FILTER_MAP.get(time_filter, TIME_FILTER_MAP["latest"])
@@ -446,31 +413,29 @@ class LinkedInSearchEngine:
         return [topic] * 10
 
     async def scrape_query(self, query: str, time_filter: str) -> list[dict] | None:
-        url = self._build_url(query, time_filter)
-        page = await self._get_page()
-        if page is None:
+        ok = await self._ensure_browser()
+        if not ok:
             return None
+
+        url = self._build_url(query, time_filter)
 
         for attempt in range(self.max_retries):
             try:
-                resp = await asyncio.wait_for(
-                    page.goto(url, wait_until="domcontentloaded"),
-                    timeout=30,
-                )
+                if self._extractor:
+                    result = await self._extractor.extract_page(
+                        url,
+                        section_name="search_results",
+                    )
 
-                if resp and resp.status >= 400:
-                    continue
+                html = await self._browser.page.content()
 
-                final_url = page.url.lower()
-                if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge")):
+                final_url = self._browser.page.url.lower()
+                if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
+                    logger.warning("Session invalid during scrape")
                     await self._cleanup()
                     return None
 
-                await page.wait_for_timeout(5000)
-
-                html = await page.content()
-
-                collected_urls = await page.evaluate("""() => {
+                collected_urls = await self._browser.page.evaluate("""() => {
                     const results = [];
                     const seen = new Set();
                     const walker = document.createTreeWalker(document.body, 1, null, false);
@@ -643,10 +608,10 @@ class LinkedInSearchEngine:
         try:
             return await asyncio.wait_for(
                 self._start_search_internal(topic, time_filter, lead_type),
-                timeout=180,
+                timeout=300,
             )
         except asyncio.TimeoutError:
-            logger.error(f"LinkedIn search timed out for topic '{topic}' after 180s")
+            logger.error(f"LinkedIn search timed out for topic '{topic}' after 300s")
             await self._cleanup()
             return {"leads": [], "has_more": False, "session_valid": False, "timeout": True}
 
@@ -732,29 +697,16 @@ class LinkedInSearchEngine:
         return saved_ids
 
     async def _cleanup(self):
-        self._page = None
-        if self._context:
-            try:
-                await self._context.close()
-            except Exception:
-                pass
-            self._context = None
+        self._extractor = None
         if self._browser:
             try:
                 await self._browser.close()
             except Exception:
                 pass
             self._browser = None
-        if self._playwright:
-            try:
-                await self._playwright.__aexit__(None, None, None)
-            except Exception:
-                pass
-            self._playwright = None
 
     async def verify_session(self) -> bool:
-        """Check if LinkedIn cookies are valid via httpx (fast, no browser needed)."""
-        cookies = _load_session_cookies(self.user_id)
+        cookies = self._session_mgr.load_cookies()
         if not cookies:
             return False
         try:
@@ -785,16 +737,19 @@ class LinkedInSearchEngine:
             return await self._verify_session_browser()
 
     async def _verify_session_browser(self) -> bool:
-        """Fallback: check session using Patchright browser."""
-        page = await self._get_page()
-        if page is None:
+        ok = await self._ensure_browser()
+        if not ok:
             return False
         try:
             await asyncio.wait_for(
-                page.goto("https://www.linkedin.com", wait_until="domcontentloaded"),
+                self._browser.page.goto(
+                    "https://www.linkedin.com",
+                    wait_until="domcontentloaded",
+                    timeout=15000,
+                ),
                 timeout=15,
             )
-            final_url = page.url.lower()
+            final_url = self._browser.page.url.lower()
             if any(x in final_url for x in ("login", "/auth/", "/checkpoint/", "challenge", "signup")):
                 await self._cleanup()
                 logger.warning("LinkedIn session check failed — redirected to login")
@@ -810,10 +765,13 @@ class LinkedInSearchEngine:
         if self._warmed:
             return
         try:
-            page = await self._get_page()
-            if page is None:
-                return
-            await page.goto("https://www.linkedin.com", wait_until="domcontentloaded", timeout=10000)
-            self._warmed = True
+            ok = await self._ensure_browser()
+            if ok:
+                await self._browser.page.goto(
+                    "https://www.linkedin.com",
+                    wait_until="domcontentloaded",
+                    timeout=10000,
+                )
+                self._warmed = True
         except Exception as e:
             logger.warning(f"LinkedIn warmup failed for user {self.user_id}: {e}")

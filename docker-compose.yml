@@ -11,6 +11,7 @@ services:
       - ./backend/.env
     volumes:
       - ./backend/sessions:/app/sessions
+      - ./backend/.linkedin-mcp:/root/.linkedin-mcp
     environment:
       - ENVIRONMENT=production
       - GMAPS_SCRAPER_PATH=/app/google-maps-scraper/google-maps-scraper

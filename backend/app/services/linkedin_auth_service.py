@@ -22,10 +22,10 @@ class LinkedInSessionManager:
         self.session_file = self.cookie_dir / f"linkedin_session{suffix}.json"
 
     def save_cookies(self, cookies: list[dict]) -> None:
-        sanitized = self._sanitize_cookies(cookies)
+        normalized = self._normalize_cookies(cookies)
         with open(self.session_file, "w") as f:
-            dump({"cookies": sanitized}, f)
-        logger.info(f"Saved {len(sanitized)} LinkedIn cookies to {self.session_file}")
+            dump({"cookies": normalized}, f)
+        logger.info(f"Saved {len(normalized)} LinkedIn cookies to {self.session_file}")
 
     def load_cookies(self) -> list[dict] | None:
         if not self.session_file.exists():
@@ -37,11 +37,7 @@ class LinkedInSessionManager:
             linkedin = [c for c in raw if "linkedin" in c.get("domain", "").lower()]
             if not linkedin:
                 return None
-            allowed = {"name", "value", "domain", "path", "expires", "httpOnly", "secure", "sameSite"}
-            return self._sanitize_cookies([
-                {k: v for k, v in c.items() if k in allowed and v is not None}
-                for c in linkedin
-            ])
+            return self._normalize_cookies(linkedin)
         except Exception as e:
             logger.warning(f"Failed to load LinkedIn cookies: {e}")
             return None
@@ -172,14 +168,18 @@ class LinkedInSessionManager:
         return result
 
     @staticmethod
-    def _sanitize_cookies(cookies: list[dict]) -> list[dict]:
-        sanitized = []
+    def _normalize_cookies(cookies: list[dict]) -> list[dict]:
+        normalized = []
         for c in cookies:
             c = dict(c)
+            if "expirationDate" in c and "expires" not in c:
+                c["expires"] = int(c.pop("expirationDate"))
+            if "expires" in c and isinstance(c["expires"], float):
+                c["expires"] = int(c["expires"])
             ss = c.get("sameSite", "")
             if ss and ss.lower() in SAMESITE_MAP:
                 c["sameSite"] = SAMESITE_MAP[ss.lower()]
             elif not ss or ss.lower() not in ("lax", "strict", "none"):
                 c["sameSite"] = "Lax"
-            sanitized.append(c)
-        return sanitized
+            normalized.append(c)
+        return normalized
