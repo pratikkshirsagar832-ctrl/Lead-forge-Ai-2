@@ -79,20 +79,57 @@ class LinkedInSessionManager:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
                     headless=True,
-                    args=["--no-sandbox", "--disable-setuid-sandbox"],
+                    args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-blink-features=AutomationControlled",
+                    ],
                 )
                 context = browser.new_context(
                     viewport={"width": 1280, "height": 720},
                     user_agent=(
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                         "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/125.0.0.0 Safari/537.36"
+                        "Chrome/148.0.0.0 Safari/537.36"
                     ),
+                    locale="en-US",
+                    timezone_id="America/New_York",
                 )
                 page = context.new_page()
-                page.goto("https://www.linkedin.com/login", timeout=60000)
-                page.fill("#username", email)
-                page.fill("#password", password)
+
+                try:
+                    page.goto("https://www.linkedin.com/login", timeout=60000)
+                    page.wait_for_load_state("networkidle")
+                    logger.info(f"Login page loaded: {page.title()} — {page.url}")
+                except Exception as e:
+                    logger.error(f"Failed to load LinkedIn login page: {e}")
+                    try:
+                        logger.error(f"Page URL: {page.url}, title: {page.title()}")
+                        body_text = page.evaluate("document.body?.innerText?.slice(0, 500) || 'no body'")
+                        logger.error(f"Page content: {body_text}")
+                    except Exception:
+                        pass
+                    browser.close()
+                    return False
+
+                is_stealth = page.evaluate("navigator.webdriver")
+                logger.info(f"navigator.webdriver: {is_stealth}")
+
+                try:
+                    page.wait_for_selector("input[name='session_key']", timeout=15000)
+                    page.fill("input[name='session_key']", email)
+                    page.fill("input[name='session_password']", password)
+                except Exception:
+                    logger.warning("session_key selector failed, trying #username fallback...")
+                    try:
+                        body_text = page.evaluate("document.body?.innerText?.slice(0, 800) || 'no body'")
+                        logger.error(f"Page at failure: {page.url} — {body_text}")
+                    except Exception:
+                        pass
+                    page.wait_for_selector("#username", timeout=15000)
+                    page.fill("#username", email)
+                    page.fill("#password", password)
+
                 page.click("button[type=submit]")
 
                 try:
@@ -120,6 +157,13 @@ class LinkedInSessionManager:
                         ])
                         browser.close()
                         return True
+                    logger.error(f"LinkedIn login failed after submit: {e}")
+                    try:
+                        logger.error(f"Post-login URL: {page.url}")
+                        body_text = page.evaluate("document.body?.innerText?.slice(0, 800) || 'no body'")
+                        logger.error(f"Post-login content: {body_text}")
+                    except Exception:
+                        pass
                     browser.close()
                     return False
 
