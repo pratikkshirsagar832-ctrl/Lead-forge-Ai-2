@@ -43,6 +43,8 @@ async def run_search_pipeline(
     niche: str,
     location: str,
     source: str = "google_maps",
+    lead_type: str = "all",
+    time_filter: str = "latest",
 ) -> None:
     supabase = get_supabase_admin()
     start_time = time.time()
@@ -61,7 +63,7 @@ async def run_search_pipeline(
                 return
 
             if source == "linkedin":
-                await _run_linkedin_search(supabase, search_id, user_id, niche)
+                await _run_linkedin_search(supabase, search_id, user_id, niche, lead_type=lead_type, time_filter=time_filter)
             else:
                 await _run_maps_search(supabase, search_id, user_id, niche, location, start_time)
 
@@ -248,7 +250,7 @@ async def _run_maps_search(
 
 
 async def _run_linkedin_search(
-    supabase, search_id: str, user_id: str, keyword: str
+    supabase, search_id: str, user_id: str, keyword: str, lead_type: str = "all", time_filter: str = "latest"
 ) -> None:
     engine = _get_linkedin_engine(user_id)
 
@@ -258,7 +260,7 @@ async def _run_linkedin_search(
     })
 
     try:
-        result = await engine.start_search(keyword, "latest", "all")
+        result = await engine.start_search(keyword, time_filter, lead_type)
 
         if result.get("session_valid") is False:
             msg = "LinkedIn cookies not found. Import your LinkedIn cookies from browser → paste them in Settings."

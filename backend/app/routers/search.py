@@ -103,6 +103,8 @@ async def create_search(
         niche=query_term,
         location=location_term,
         source=source,
+        lead_type=request.lead_type,
+        time_filter=request.time_filter,
     )
 
     return search
