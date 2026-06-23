@@ -234,7 +234,6 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
                 onChange={(e) => setCookieJson(e.target.value)}
                 placeholder='[{"name":"li_at","value":"AQED...","domain":".linkedin.com","path":"/","httpOnly":true,"secure":true,"sameSite":"None"}]'
                 rows={6}
-                disabled={state === 'submitting'}
                 className="w-full px-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-accent-cyan/40 focus:border-accent-cyan/50 transition-all text-offwhite text-xs font-mono placeholder-ice/20 outline-none resize-none disabled:opacity-50"
               />
               <p className="text-[11px] text-ice/30 mt-1.5">
