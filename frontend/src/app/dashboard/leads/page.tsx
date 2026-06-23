@@ -45,7 +45,7 @@ function LeadsContent() {
           <h1 className="text-3xl font-extrabold text-offwhite tracking-tight flex items-center gap-3">
             Leads Pipeline
           </h1>
-          <p className="text-ice/60 mt-2 text-sm font-medium">Manage, filter, and review scraped leads from your search campaigns.</p>
+          <p className="text-ice/60 mt-2 text-sm font-medium">Manage, filter, and review discovered leads from your search campaigns.</p>
         </div>
         <div className="relative">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-steel to-ice rounded-xl blur opacity-30" />

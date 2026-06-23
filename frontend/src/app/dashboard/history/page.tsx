@@ -47,7 +47,7 @@ export default function HistoryPage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-bold text-offwhite tracking-tight">Search History</h1>
-        <p className="text-ice/60 mt-2">View logs of all your past scraping operations.</p>
+        <p className="text-ice/60 mt-2">View logs of all your past searches.</p>
       </div>
 
       {isLoading ? (
@@ -62,7 +62,7 @@ export default function HistoryPage() {
       ) : history.length === 0 ? (
         <EmptyState
           title="No history yet"
-          description="You haven't run any searches yet. Start your first scrape to see it here."
+          description="You haven't run any searches yet. Start your first search to see it here."
           actionText="Start Search"
           actionHref="/dashboard/search"
         />

@@ -41,7 +41,7 @@ export const USER_STATUSES = {
 
 export const SEARCH_STATUSES = {
   queued: { label: 'Queued', color: '#2A35E0' },
-  scraping: { label: 'Scraping', color: '#F59E0B' },
+  scraping: { label: 'Searching', color: '#F59E0B' },
   analyzing: { label: 'Analyzing', color: '#3B82F6' },
   completed: { label: 'Completed', color: '#10B981' },
   failed: { label: 'Failed', color: '#DC2626' },

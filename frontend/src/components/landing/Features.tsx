@@ -7,8 +7,8 @@ import { ScrollReveal } from '@/lib/animations';
 const features = [
   {
     icon: <Map className="w-6 h-6" />,
-    title: 'Google Maps Scraping',
-    description: 'Instantly extract hundreds of local businesses in any niche and location directly from Google Maps.',
+    title: 'Google Maps Searching',
+    description: 'Instantly find hundreds of local businesses in any niche and location directly from Google Maps.',
     gradient: 'from-violet-400/20 to-steel/20',
     color: 'text-violet-400',
     accent: 'via-violet-500',
@@ -98,7 +98,7 @@ export function Features() {
           </ScrollReveal>
           <ScrollReveal delay={0.2}>
             <p className="text-lg text-ice/60 max-w-2xl mx-auto">
-              Stop switching between different tools. Hyperclients combines map scraping, website analysis,
+              Stop switching between different tools. Hyperclients combines map search, website analysis,
               AI personalization, and CRM tracking into one seamless workflow.
             </p>
           </ScrollReveal>

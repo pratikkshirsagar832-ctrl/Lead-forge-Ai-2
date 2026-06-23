@@ -209,7 +209,7 @@ async def _run_maps_search(
 
     await _update_search(supabase, search_id, {
         "progress_percent": 10,
-        "message": f"Scraping Google Maps for '{niche}' in {location}...",
+        "message": f"Searching Google Maps for '{niche}' in {location}...",
     })
 
     try:
