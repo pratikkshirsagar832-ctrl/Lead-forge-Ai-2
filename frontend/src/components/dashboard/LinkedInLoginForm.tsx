@@ -24,6 +24,7 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const checkSession = useCallback(async () => {
@@ -89,9 +90,10 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
       return;
     }
 
-    setState('submitting');
+    setIsSubmitting(true);
     try {
       const { data } = await api.post('/api/linkedin/session/import-cookies', { cookies });
+      setIsSubmitting(false);
       if (data.success) {
         setState('success');
         setTimeout(onLoggedIn, 1000);
@@ -100,6 +102,7 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
         setError(data.message || 'li_at cookie not found. Make sure you are logged into LinkedIn when exporting.');
       }
     } catch (err: any) {
+      setIsSubmitting(false);
       setState('error');
       setError(err.response?.data?.detail || 'Failed to import cookies.');
     }
@@ -109,10 +112,11 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
     setError('');
-    setState('submitting');
+    setIsSubmitting(true);
 
     try {
       const { data } = await api.post('/api/linkedin/session/login', { email, password });
+      setIsSubmitting(false);
       if (data.success) {
         setState('running');
         startPolling();
@@ -121,6 +125,7 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
         setError(data.message || 'Failed to start login.');
       }
     } catch (err: any) {
+      setIsSubmitting(false);
       setState('error');
       setError(err.response?.data?.detail || 'Failed to connect to server.');
     }
@@ -254,11 +259,11 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
 
             <LoadingButton
               type="submit"
-              isLoading={state === 'submitting'}
+              isLoading={isSubmitting}
               variant="gradient-cyan"
               size="lg"
               fullWidth
-              disabled={state === 'submitting' || !cookieJson.trim()}
+              disabled={isSubmitting || !cookieJson.trim()}
             >
               <Upload className="w-4 h-4" />
               Import Cookies
@@ -293,7 +298,7 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
-                disabled={state === 'submitting'}
+                disabled={isSubmitting}
                 className="w-full px-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-accent-cyan/40 focus:border-accent-cyan/50 transition-all text-offwhite placeholder-ice/30 outline-none disabled:opacity-50"
               />
             </div>
@@ -310,7 +315,7 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="LinkedIn password"
                   required
-                  disabled={state === 'submitting'}
+                  disabled={isSubmitting}
                   className="w-full px-4 py-3 pr-12 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-accent-cyan/40 focus:border-accent-cyan/50 transition-all text-offwhite placeholder-ice/30 outline-none disabled:opacity-50"
                 />
                 <button
@@ -337,11 +342,11 @@ export function LinkedInLoginForm({ onLoggedIn }: LinkedInLoginFormProps) {
 
             <LoadingButton
               type="submit"
-              isLoading={state === 'submitting'}
+              isLoading={isSubmitting}
               variant="gradient-cyan"
               size="lg"
               fullWidth
-              disabled={state === 'submitting' || !email.trim() || !password.trim()}
+              disabled={isSubmitting || !email.trim() || !password.trim()}
             >
               <Linkedin className="w-4 h-4" />
               Sign in with LinkedIn
