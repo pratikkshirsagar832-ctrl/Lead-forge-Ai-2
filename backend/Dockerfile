@@ -44,8 +44,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Chromium for Patchright (patched Playwright)
-RUN python -m playwright install chromium --with-deps 2>&1 && echo "Chromium install succeeded" || (echo "Chromium install failed - trying without deps" && python -m playwright install chromium 2>&1) || echo "Chromium install failed (non-fatal)"
+# Install Chromium for Patchright (patched Playwright — different browser builds/paths)
+RUN patchright install chromium --with-deps 2>&1 && echo "Patchright Chromium OK" || (patchright install chromium 2>&1 && echo "Patchright Chromium OK (no-deps)") || echo "Patchright Chromium FAILED (non-fatal)"
 
 # Copy the built Go binary
 COPY --from=go-builder /google-maps-scraper /app/google-maps-scraper/google-maps-scraper
