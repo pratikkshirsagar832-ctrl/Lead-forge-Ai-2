@@ -50,16 +50,6 @@ async def get_current_user(
         }
 
         try:
-            existing = supabase.table("users").select("id").eq("id", user.id).limit(1).execute()
-            if not existing.data:
-                supabase.table("users").insert({
-                    "id": user.id,
-                    "email": user.email or "",
-                }).execute()
-        except Exception as sync_err:
-            logger.warning(f"User sync failed (non-critical): {sync_err}")
-
-        try:
             sub_exists = supabase.table("user_subscriptions").select("id").eq("user_id", user.id).limit(1).execute()
             if not sub_exists.data or len(sub_exists.data) == 0:
                 from datetime import datetime, timedelta, timezone

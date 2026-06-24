@@ -22,20 +22,29 @@ router = APIRouter(prefix="/api/ai", tags=["AI"])
 
 def _increment_ai_usage(user_id: str) -> None:
     supabase = get_supabase_admin()
-    today = date.today().isoformat()
-    existing = supabase.table("daily_usage").select("id, ai_calls").eq("user_id", user_id).eq("date", today).execute()
-    if existing.data and len(existing.data) > 0:
-        supabase.table("daily_usage").update({
-            "ai_calls": (existing.data[0].get("ai_calls", 0) or 0) + 1,
-        }).eq("id", existing.data[0]["id"]).execute()
-    else:
-        supabase.table("daily_usage").insert({
-            "user_id": user_id,
-            "date": today.isoformat(),
-            "searches_run": 0,
-            "leads_generated": 0,
-            "ai_calls": 1,
+    try:
+        supabase.rpc("increment_daily_usage", {
+            "p_user_id": user_id,
+            "p_ai_calls": 1,
+            "p_searches": 0,
+            "p_leads": 0,
         }).execute()
+    except Exception as e:
+        logger.warning(f"Failed to increment AI usage via RPC: {e}")
+        today = date.today().isoformat()
+        existing = supabase.table("daily_usage").select("id, ai_calls").eq("user_id", user_id).eq("date", today).execute()
+        if existing.data and len(existing.data) > 0:
+            supabase.table("daily_usage").update({
+                "ai_calls": (existing.data[0].get("ai_calls", 0) or 0) + 1,
+            }).eq("id", existing.data[0]["id"]).execute()
+        else:
+            supabase.table("daily_usage").insert({
+                "user_id": user_id,
+                "date": today.isoformat(),
+                "searches_run": 0,
+                "leads_generated": 0,
+                "ai_calls": 1,
+            }).execute()
 
 AI_DAILY_LIMIT = 100
 
