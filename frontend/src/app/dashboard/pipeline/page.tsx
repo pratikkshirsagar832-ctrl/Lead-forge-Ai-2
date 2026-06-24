@@ -277,10 +277,6 @@ export default function PipelinePage() {
   const fetchAllLeads = useCallback(async () => {
     try {
       setIsLoading(true);
-      const params = new URLSearchParams({ per_page: '500' });
-      const { data } = await api.get(`${API_ROUTES.leads.list}?${params.toString()}`);
-      const items: LeadListItem[] = data.items || [];
-
       const grouped: Record<StageKey, LeadListItem[]> = {
         new: [],
         contacted: [],
@@ -288,18 +284,24 @@ export default function PipelinePage() {
         converted: [],
         lost: [],
       };
+      let total = 0;
 
-      for (const lead of items) {
-        const status = (lead.user_status || 'new') as StageKey;
-        if (grouped[status]) {
-          grouped[status].push(lead);
-        } else {
-          grouped.new.push(lead);
-        }
+      const statuses = ['new', 'contacted', 'replied', 'converted', 'lost'];
+      const results = await Promise.all(
+        statuses.map(async (status) => {
+          const params = new URLSearchParams({ user_status: status, per_page: '100' });
+          const { data } = await api.get(`${API_ROUTES.leads.list}?${params.toString()}`);
+          return { status, items: data.items || [] };
+        })
+      );
+
+      for (const { status, items } of results) {
+        grouped[status as StageKey] = items;
+        total += items.length;
       }
 
       setLeadsByStage(grouped);
-      setTotalCount(data.total || items.length);
+      setTotalCount(total);
     } catch {
       showToast('Failed to load pipeline leads', 'error');
     } finally {
@@ -394,7 +396,7 @@ export default function PipelinePage() {
       <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-extrabold text-offwhite tracking-tight">Pipeline</h1>
+            <h1 className="text-3xl font-extrabold text-offwhite tracking-tight">Lead Manager</h1>
             <p className="text-ice/60 mt-2 text-sm font-medium">Drag leads between stages to track your sales pipeline.</p>
           </div>
         </div>
@@ -421,7 +423,7 @@ export default function PipelinePage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 relative">
         <div>
           <h1 className="text-3xl font-extrabold text-offwhite tracking-tight flex items-center gap-3">
-            Pipeline
+            Lead Manager
           </h1>
           <p className="text-ice/60 mt-2 text-sm font-medium">
             Drag leads between stages to track your sales pipeline.

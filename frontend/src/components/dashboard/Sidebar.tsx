@@ -22,7 +22,6 @@ import {
   Zap,
   Sparkles,
   ArrowUpRight,
-  Bot,
   Kanban,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -32,12 +31,11 @@ const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'New Search', href: '/dashboard/search', icon: Search },
   { name: 'Leads', href: '/dashboard/leads', icon: Users },
-  { name: 'Pipeline', href: '/dashboard/pipeline', icon: Kanban },
+  { name: 'Lead Manager', href: '/dashboard/pipeline', icon: Kanban },
   { name: 'History', href: '/dashboard/history', icon: History },
   { name: 'Export', href: '/dashboard/export', icon: Download },
   { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-  { name: 'Hyper Agent', href: '/dashboard/hyper-agent', icon: Bot },
 ];
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
