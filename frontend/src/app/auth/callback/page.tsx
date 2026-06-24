@@ -2,58 +2,67 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 
+function hasGuestSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('hyperclients_guest') === 'true';
+}
+
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [error, setError] = useState('');
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
+
+    const redirectToLogin = () => {
+      if (mountedRef.current) router.replace('/login?error=auth_config');
+    };
 
     const handleCallback = async () => {
       try {
-        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
-        const queryParams = new URLSearchParams(window.location.search);
-
-        // PKCE flow: exchange code for session
-        const code = queryParams.get('code');
-        if (code) {
-          await supabase.auth.exchangeCodeForSession(code);
-          if (mounted) router.replace('/dashboard');
-          return;
-        }
-
-        // Implicit flow: set session from URL hash
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          } as { access_token: string; refresh_token: string });
-          if (!error && mounted) router.replace('/dashboard');
-          else throw error || new Error('No session returned');
-          return;
-        }
-
-        // Already have a session from localStorage
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted && session) {
+        if (hasGuestSession()) {
           router.replace('/dashboard');
           return;
         }
 
-        // Nothing worked — timeout then redirect to login
-        setTimeout(() => {
-          if (mounted) router.replace('/login');
-        }, 3000);
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        const queryParams = new URLSearchParams(window.location.search);
+
+        const code = queryParams.get('code');
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+          if (mountedRef.current) router.replace('/dashboard');
+          return;
+        }
+
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          } as { access_token: string; refresh_token: string });
+          if (!sessionError && mountedRef.current) router.replace('/dashboard');
+          else redirectToLogin();
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mountedRef.current && session) {
+          router.replace('/dashboard');
+          return;
+        }
+
+        redirectToLogin();
       } catch (err) {
         console.error('Auth callback error:', err);
-        if (mounted) setTimeout(() => router.replace('/login'), 3000);
+        redirectToLogin();
       }
     };
 
@@ -66,7 +75,7 @@ export default function AuthCallbackPage() {
         <div className="text-center">
            <p className="text-rose-400 mb-4">{String(error)}</p>
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => router.push('/login?error=auth_config')}
             className="px-6 py-2 rounded-lg bg-steel text-offwhite font-semibold hover:opacity-90 transition-opacity"
           >
             Back to Login
