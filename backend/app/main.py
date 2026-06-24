@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import get_supabase_admin
 
-from app.routers import search, leads, dashboard, ai, auth, subscriptions, linkedin
+from app.routers import search, leads, dashboard, ai, auth, subscriptions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,14 +44,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"Frontend URL: {settings.frontend_url}")
     logger.info(f"Supabase URL: {settings.supabase_url}")
 
-    # Pre-warm LinkedIn browser
-    try:
-        from app.services.linkedin_scraper_service import LinkedInSearchEngine
-        engine = LinkedInSearchEngine()
-        await engine.warmup()
-    except Exception as e:
-        logger.warning(f"LinkedIn warmup skipped: {e}")
-
     yield
 
     logger.info("Hyperclients Backend shutting down...")
@@ -83,7 +75,6 @@ def create_app() -> FastAPI:
     app.include_router(leads.router)
     app.include_router(dashboard.router)
     app.include_router(ai.router)
-    app.include_router(linkedin.router)
 
     @app.get("/", tags=["Root"])
     async def root():

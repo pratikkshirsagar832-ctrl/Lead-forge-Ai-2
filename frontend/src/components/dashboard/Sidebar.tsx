@@ -22,6 +22,7 @@ import {
   Zap,
   Sparkles,
   ArrowUpRight,
+  Bot,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -34,6 +35,7 @@ const navItems = [
   { name: 'Export', href: '/dashboard/export', icon: Download },
   { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Hyper Agent', href: '/dashboard/hyper-agent', icon: Bot },
 ];
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {

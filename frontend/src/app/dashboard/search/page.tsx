@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,124 +11,20 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { Badge } from '@/components/shared/Badge';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { SearchProgressCard } from '@/components/dashboard/SearchProgressCard';
-import { LinkedInLoginForm } from '@/components/dashboard/LinkedInLoginForm';
 import { UpgradeModal } from '@/components/shared/UpgradeModal';
 import { API_ROUTES } from '@/lib/constants';
 import { useSearchStore } from '@/stores/searchStore';
-import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Linkedin, Quote, ExternalLink, Zap, Target, Activity, Hash, Search } from 'lucide-react';
+import { MapPin, Briefcase, SearchIcon, Sparkles, Globe, Star, Phone, ChevronRight, Users, AlertCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { LEAD_CATEGORIES } from '@/lib/constants';
-
-type SearchSource = 'google_maps' | 'linkedin';
 
 const mapsSchema = z.object({
   niche: z.string().min(2, 'Niche must be at least 2 characters'),
   location: z.string().min(2, 'Location must be at least 2 characters'),
 });
 
-const linkedinSchema = z.object({
-  keyword: z.string().min(2, 'Keyword must be at least 2 characters'),
-});
-
-type LinkedInLeadType = 'all' | 'intern' | 'agency' | 'company' | 'one_client';
-type LinkedInTimeFilter = 'latest' | '7_days' | '14_days' | '27_days' | '2_months';
-
-const LINKEDIN_TIME_OPTIONS: { label: string; value: LinkedInTimeFilter }[] = [
-  { label: 'Latest', value: 'latest' },
-  { label: '7 Days', value: '7_days' },
-  { label: '14 Days', value: '14_days' },
-  { label: '27 Days', value: '27_days' },
-  { label: '2 Months', value: '2_months' },
-];
-
-const LEAD_TYPE_OPTIONS: { label: string; value: LinkedInLeadType; desc: string }[] = [
-  { label: 'All', value: 'all', desc: 'Any buying intent' },
-  { label: 'Intern', value: 'intern', desc: 'Internship / entry-level' },
-  { label: 'Agency', value: 'agency', desc: 'Looking for agency' },
-  { label: 'Company', value: 'company', desc: 'Full-time hiring' },
-  { label: 'One Client', value: 'one_client', desc: 'One-time project' },
-];
-
 function LiveResultCard({ lead, index }: { lead: any; index: number }) {
-  const isLinkedIn = lead.source === 'linkedin';
-
-  if (isLinkedIn) {
-    const scorePercent = lead.intent_score != null ? Math.round(lead.intent_score * 100) : 0;
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.4, delay: index * 0.08, ease: 'easeOut' }}
-      >
-        <Link href={`/dashboard/leads/${lead.id}`} className="block group">
-          <div className="glass-card-premium rounded-xl hover:border-accent-cyan/20 transition-all duration-300 hover:-translate-y-1">
-            <div className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-cyan/20 to-accent-purple/20 flex items-center justify-center shrink-0 ring-1 ring-accent-cyan/20">
-                      <Users className="w-4 h-4 text-accent-cyan" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-offwhite truncate flex items-center gap-1.5">
-                        {lead.author_name || 'LinkedIn User'}
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-cyan/10 text-accent-cyan font-semibold shrink-0">LinkedIn</span>
-                      </p>
-                    </div>
-                  </div>
-                  {lead.intent_score >= 0.7 && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 font-semibold shrink-0">
-                    <Zap className="w-3 h-3" />
-                    {scorePercent}%
-                  </span>
-                )}
-              </div>
-              {lead.post_text && (
-                <p className="text-xs text-ice/70 leading-relaxed line-clamp-3 mb-3 font-light">
-                  <Quote className="w-3 h-3 text-accent-cyan/30 inline-block mr-1" />
-                  {lead.post_text}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ice/40">
-                {lead.author_profile && (
-                  <a
-                    href={lead.author_profile}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 text-accent-cyan/60 hover:text-accent-cyan transition-colors"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    View Profile
-                  </a>
-                )}
-                {lead.post_url && (
-                  <a
-                    href={lead.post_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 text-accent-cyan/60 hover:text-accent-cyan transition-colors"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    View Post
-                  </a>
-                )}
-                {lead.intent_reason && (
-                  <span className="truncate italic text-ice/40">{lead.intent_reason}</span>
-                )}
-              </div>
-            </div>
-            <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[10px] font-semibold text-accent-cyan/50 group-hover:text-accent-cyan transition-colors">
-              <span>View Lead</span>
-              <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-            </div>
-          </div>
-        </Link>
-      </motion.div>
-    );
-  }
-
   const catKey = lead.lead_category || 'warm';
   const catCfg = LEAD_CATEGORIES[catKey as keyof typeof LEAD_CATEGORIES] || { label: catKey, color: '#94a3b8', bg: '#f1f5f9' };
 
@@ -218,14 +114,9 @@ export default function SearchPage() {
     clearActiveSearch,
   } = useSearch();
 
-  const [source, setSource] = useState<SearchSource>('google_maps');
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [linkedinKeyword, setLinkedinKeyword] = useState('');
-  const [linkedinTimeFilter, setLinkedinTimeFilter] = useState<LinkedInTimeFilter>('latest');
-  const [linkedinLeadType, setLinkedinLeadType] = useState<LinkedInLeadType>('all');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [linkedinSessionOk, setLinkedinSessionOk] = useState(false);
 
   const mapsForm = useForm({ resolver: zodResolver(mapsSchema) });
 
@@ -247,17 +138,7 @@ export default function SearchPage() {
     }
   };
 
-  const onSubmitLinkedin = async () => {
-    if (isAtLimit) { setShowUpgradeModal(true); return; }
-    if (!linkedinKeyword.trim()) return;
-    try {
-      await startSearch(linkedinKeyword.trim(), 'linkedin', { leadType: linkedinLeadType, timeFilter: linkedinTimeFilter });
-    } catch (e: any) {
-      if (e.response?.status === 429) setShowUpgradeModal(true);
-    }
-  };
-
-  const handleLoadMore = useCallback(async () => {
+  const handleLoadMore = async () => {
     if (!activeSearchId || isLoadingMore) return;
     setIsLoadingMore(true);
     try {
@@ -273,21 +154,7 @@ export default function SearchPage() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [activeSearchId, isLoadingMore]);
-
-  const checkLinkedInSession = useCallback(async () => {
-    if (source !== 'linkedin') return;
-    try {
-      const { data } = await api.get('/api/linkedin/session/status');
-      setLinkedinSessionOk(!!data.logged_in);
-    } catch {
-      setLinkedinSessionOk(false);
-    }
-  }, [source]);
-
-  useEffect(() => {
-    checkLinkedInSession();
-  }, [checkLinkedInSession]);
+  };
 
   const isSearchActive = activeSearchId && progress && !['completed', 'failed', 'cancelled'].includes(progress.status ?? '');
 
@@ -302,221 +169,62 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {!isSearchActive && !progress && (
-        <div className="flex gap-1.5 bg-navy/40 p-1 rounded-2xl border border-ocean/20 backdrop-blur-sm w-fit card-glow">
-          <button
-            onClick={() => setSource('google_maps')}
-            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
-              source === 'google_maps'
-                ? 'text-offwhite shadow-lg shadow-steel/20'
-                : 'text-ice/40 hover:text-ice/70'
-            }`}
-          >
-            {source === 'google_maps' && (
-              <motion.div
-                layoutId="source-bg"
-                className="absolute inset-0 bg-gradient-to-r from-steel/25 to-steel/10 rounded-xl border border-steel/20"
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              />
-            )}
-            <span className="relative z-10 flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Google Maps
-            </span>
-          </button>
-          <button
-            onClick={() => setSource('linkedin')}
-            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
-              source === 'linkedin'
-                ? 'text-offwhite shadow-lg shadow-accent-cyan/10'
-                : 'text-ice/40 hover:text-ice/70'
-            }`}
-          >
-            {source === 'linkedin' && (
-              <motion.div
-                layoutId="source-bg"
-                className="absolute inset-0 bg-gradient-to-r from-accent-cyan/20 to-accent-purple/10 rounded-xl border border-accent-cyan/20"
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              />
-            )}
-            <span className="relative z-10 flex items-center gap-2">
-              <Linkedin className="w-4 h-4" />
-              LinkedIn
-            </span>
-          </button>
-        </div>
-      )}
-
       <AnimatePresence mode="wait">
         {!isSearchActive && !progress ? (
           <motion.div
-            key={source}
+            key="maps"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
           >
-            {source === 'google_maps' ? (
-              <div className="glass-card-premium rounded-2xl p-8 max-w-3xl mx-auto border-ocean/20">
-                <form onSubmit={mapsForm.handleSubmit(onSubmitMaps)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
-                        <Target className="w-4 h-4 text-steel" />
-                        Target Niche
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Briefcase className="h-5 w-5 text-steel/60 group-focus-within:text-steel transition-colors" />
-                        </div>
-                        <input
-                          {...mapsForm.register('niche')}
-                          type="text"
-                          placeholder="e.g. Plumbers, Dentists"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-steel/40 focus:border-steel/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
-                        />
-                      </div>
-                      {mapsForm.formState.errors.niche && (
-                        <p className="text-red-400 text-sm mt-1.5">{mapsForm.formState.errors.niche.message}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-steel" />
-                        Location
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Globe className="h-5 w-5 text-steel/60 group-focus-within:text-steel transition-colors" />
-                        </div>
-                        <input
-                          {...mapsForm.register('location')}
-                          type="text"
-                          placeholder="e.g. Dallas TX, London UK"
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-steel/40 focus:border-steel/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
-                        />
-                      </div>
-                      {mapsForm.formState.errors.location && (
-                        <p className="text-red-400 text-sm mt-1.5">{mapsForm.formState.errors.location.message}</p>
-                      )}
-                    </div>
-                  </div>
-                  <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
-                </form>
-              </div>
-            ) : !linkedinSessionOk ? (
-              <LinkedInLoginForm onLoggedIn={() => { setLinkedinSessionOk(true); }} />
-            ) : (
-              <div className="glass-card-premium rounded-2xl p-8 max-w-3xl mx-auto border-accent-cyan/10">
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-ocean/20">
-                  <div className="flex items-center gap-2">
-                    <Linkedin className="w-5 h-5 text-accent-cyan" />
-                    <span className="text-sm font-semibold text-ice/70">LinkedIn</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Session Active</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await api.post('/api/linkedin/session/logout');
-                        setLinkedinSessionOk(false);
-                      } catch {}
-                    }}
-                    className="text-[11px] text-ice/40 hover:text-rose-400 transition-colors"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-                <form onSubmit={(e) => { e.preventDefault(); onSubmitLinkedin(); }} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
-                        <Hash className="w-4 h-4 text-accent-cyan" />
-                        Keyword
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <SearchIcon className="h-5 w-5 text-accent-cyan/60 group-focus-within:text-accent-cyan transition-colors" />
-                        </div>
-                        <input
-                          value={linkedinKeyword}
-                          onChange={(e) => setLinkedinKeyword(e.target.value)}
-                          type="text"
-                          placeholder="e.g. AI automation, website development..."
-                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-accent-cyan/40 focus:border-accent-cyan/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
-                        <Target className="w-4 h-4 text-accent-cyan" />
-                        Lead Type
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {LEAD_TYPE_OPTIONS.map((opt) => (
-                          <motion.button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setLinkedinLeadType(opt.value)}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className={`relative px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                              linkedinLeadType === opt.value
-                                ? 'bg-gradient-to-r from-accent-purple/20 to-accent-purple/10 text-accent-purple border border-accent-purple/30 shadow-lg shadow-accent-purple/10'
-                                : 'bg-navy/40 text-ice/40 border border-ocean/20 hover:border-ocean/40 hover:text-ice/60'
-                            }`}
-                            title={opt.desc}
-                          >
-                            {linkedinLeadType === opt.value && (
-                              <motion.div
-                                layoutId="lead-type-bg"
-                                className="absolute inset-0 rounded-xl bg-gradient-to-r from-accent-purple/15 to-transparent"
-                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                              />
-                            )}
-                            <span className="relative z-10">{opt.label}</span>
-                          </motion.button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
+            <div className="glass-card-premium rounded-2xl p-8 max-w-3xl mx-auto border-ocean/20">
+              <form onSubmit={mapsForm.handleSubmit(onSubmitMaps)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Activity className="w-4 h-4 text-ice/50" />
-                      <span className="text-xs text-ice/50 font-semibold uppercase tracking-widest">Time Filter</span>
+                    <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
+                      <TargetIcon className="w-4 h-4 text-steel" />
+                      Target Niche
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Briefcase className="h-5 w-5 text-steel/60 group-focus-within:text-steel transition-colors" />
+                      </div>
+                      <input
+                        {...mapsForm.register('niche')}
+                        type="text"
+                        placeholder="e.g. Plumbers, Dentists"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-steel/40 focus:border-steel/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
+                      />
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {LINKEDIN_TIME_OPTIONS.map((opt) => (
-                        <motion.button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setLinkedinTimeFilter(opt.value)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className={`relative px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                            linkedinTimeFilter === opt.value
-                              ? 'bg-gradient-to-r from-accent-cyan/20 to-accent-cyan/10 text-accent-cyan border border-accent-cyan/30 shadow-lg shadow-accent-cyan/10'
-                              : 'bg-navy/40 text-ice/40 border border-ocean/20 hover:border-ocean/40 hover:text-ice/60'
-                          }`}
-                        >
-                          {linkedinTimeFilter === opt.value && (
-                            <motion.div
-                              layoutId="time-bg"
-                              className="absolute inset-0 rounded-xl bg-gradient-to-r from-accent-cyan/15 to-transparent"
-                              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                            />
-                          )}
-                          <span className="relative z-10">{opt.label}</span>
-                        </motion.button>
-                      ))}
-                    </div>
+                    {mapsForm.formState.errors.niche && (
+                      <p className="text-red-400 text-sm mt-1.5">{mapsForm.formState.errors.niche.message}</p>
+                    )}
                   </div>
-
-                  <LinkedInSearchInfo isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
-                </form>
-              </div>
-            )}
+                  <div>
+                    <label className="block text-sm font-medium text-ice/70 mb-2 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-steel" />
+                      Location
+                    </label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Globe className="h-5 w-5 text-steel/60 group-focus-within:text-steel transition-colors" />
+                      </div>
+                      <input
+                        {...mapsForm.register('location')}
+                        type="text"
+                        placeholder="e.g. Dallas TX, London UK"
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-ocean/30 bg-navy/60 focus:bg-navy/80 focus:ring-2 focus:ring-steel/40 focus:border-steel/50 transition-all text-offwhite text-lg placeholder-ice/30 outline-none"
+                      />
+                    </div>
+                    {mapsForm.formState.errors.location && (
+                      <p className="text-red-400 text-sm mt-1.5">{mapsForm.formState.errors.location.message}</p>
+                    )}
+                  </div>
+                </div>
+                <SearchInfoSection isAtLimit={isAtLimit} remaining={remaining} searchesPerDay={searchesPerDay} isStarting={isStarting} />
+              </form>
+            </div>
           </motion.div>
         ) : (
           <motion.div
@@ -593,6 +301,16 @@ export default function SearchPage() {
   );
 }
 
+function TargetIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
 function SearchInfoSection({ isAtLimit, remaining, searchesPerDay, isStarting }: { isAtLimit: boolean; remaining: number; searchesPerDay: number; isStarting: boolean }) {
   return (
     <>
@@ -615,48 +333,6 @@ function SearchInfoSection({ isAtLimit, remaining, searchesPerDay, isStarting }:
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-xs text-ice/40">
-          {remaining}/{searchesPerDay} searches remaining today
-        </span>
-        <LoadingButton
-          type="submit"
-          isLoading={isStarting}
-          size="lg"
-          fullWidth={false}
-          variant={isAtLimit ? 'outline' : 'gradient-cyan'}
-          className="text-lg py-4 px-8"
-          disabled={isAtLimit}
-        >
-          <SearchIcon className="w-5 h-5" />
-          Start Search
-        </LoadingButton>
-      </div>
-    </>
-  );
-}
-
-function LinkedInSearchInfo({ isAtLimit, remaining, searchesPerDay, isStarting }: { isAtLimit: boolean; remaining: number; searchesPerDay: number; isStarting: boolean }) {
-  return (
-    <>
-      {isAtLimit ? (
-        <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/30 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-rose-300 font-semibold">Daily search limit reached</p>
-            <p className="text-xs text-rose-400/80 mt-1">You&apos;ve used all {searchesPerDay} searches today. Upgrade your plan or wait until tomorrow.</p>
-            <Link href="/dashboard/billing" className="text-xs text-steel hover:underline mt-2 inline-block">Upgrade Plan &rarr;</Link>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-r from-accent-cyan/[0.04] to-accent-purple/[0.04] p-4 rounded-xl border border-accent-cyan/10 flex items-start gap-3 neon-glow">
-          <Sparkles className="w-5 h-5 text-accent-cyan shrink-0 mt-0.5" />
-          <p className="text-sm text-ice/60 leading-relaxed">
-            Hyperclients will search LinkedIn for people expressing buying intent, score them with AI, and deliver qualified leads. Results typically in 1-3 minutes.
-          </p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between pt-4 border-t border-ocean/20">
         <span className="text-xs text-ice/40">
           {remaining}/{searchesPerDay} searches remaining today
         </span>

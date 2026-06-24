@@ -43,3 +43,7 @@ Linkdin_Scraper/
 
 # Cloned MCP server repo (not part of project)
 linkedin-mcp-server/
+
+# KeeLead source (code copied to frontend)
+/keelead
+

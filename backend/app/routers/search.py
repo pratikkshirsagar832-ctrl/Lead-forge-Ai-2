@@ -29,7 +29,7 @@ from app.schemas.search import (
     SearchResponse,
     SearchStatusResponse,
 )
-from app.services.pipeline import cancel_search, run_search_pipeline, load_more_maps_search, load_more_linkedin_search
+from app.services.pipeline import cancel_search, run_search_pipeline, load_more_maps_search
 
 router = APIRouter(prefix="/api/searches", tags=["Searches"])
 
@@ -43,17 +43,15 @@ async def create_search(
     """Create a new search and start the background pipeline."""
     supabase = get_supabase_admin()
     user_id = current_user["id"]
-    source = request.source
 
-    # For LinkedIn searches, location is not needed — use keyword directly
     query_term = request.niche.strip()
-    location_term = request.location.strip() if source == "google_maps" else "linkedin"
+    location_term = request.location.strip()
 
     search_data = {
         "user_id": user_id,
         "niche": query_term,
         "location": location_term,
-        "source": source,
+        "source": "google_maps",
         "status": "queued",
         "progress_percent": 0,
         "message": "Search queued",
@@ -102,9 +100,6 @@ async def create_search(
         user_id=user_id,
         niche=query_term,
         location=location_term,
-        source=source,
-        lead_type=request.lead_type,
-        time_filter=request.time_filter,
     )
 
     return search
@@ -233,7 +228,7 @@ async def get_search_results(
 
         response = (
             supabase.table("leads")
-            .select("id, source, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite, author_name, author_profile, post_text, post_url, intent_score, intent_reason, linkedin_keyword")
+            .select("id, source, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite")
             .eq("search_id", search_id)
             .eq("user_id", current_user["id"])
             .order("created_at", desc=False)
@@ -380,16 +375,8 @@ async def load_more_results(
             raise HTTPException(status_code=404, detail="Search not found")
 
         search = response.data[0]
-        source = search.get("source", "google_maps")
 
-        if source == "linkedin":
-            new_count = await load_more_linkedin_search(
-                search_id=search_id,
-                user_id=current_user["id"],
-                keyword=search["niche"],
-            )
-        else:
-            new_count = await load_more_maps_search(
+        new_count = await load_more_maps_search(
                 search_id=search_id,
                 user_id=current_user["id"],
                 niche=search["niche"],

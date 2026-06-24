@@ -133,7 +133,7 @@ export function useSearch() {
     };
   }, [pollStatus, pollResults, clearPolling]);
 
-  const startSearch = async (niche: string, locationOrSource: string, options?: { leadType?: string; timeFilter?: string }) => {
+  const startSearch = async (niche: string, location: string) => {
     if (isStartingRef.current) return;
     try {
       isStartingRef.current = true;
@@ -144,10 +144,7 @@ export function useSearch() {
       statusRetryRef.current = 0;
       resultsRetryRef.current = 0;
 
-      const isLinkedIn = locationOrSource === 'linkedin';
-      const payload = isLinkedIn
-        ? { niche, location: '', source: 'linkedin' as const, lead_type: options?.leadType || 'all', time_filter: options?.timeFilter || 'latest' }
-        : { niche, location: locationOrSource, source: 'google_maps' as const };
+      const payload = { niche, location, source: 'google_maps' as const };
 
       const { data } = await api.post(API_ROUTES.searches.create, payload);
       setActiveSearch(data.id);

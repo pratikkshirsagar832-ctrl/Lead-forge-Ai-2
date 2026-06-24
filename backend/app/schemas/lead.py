@@ -25,13 +25,6 @@ class LeadListItem(BaseModel):
     user_status: str = "new"
     is_favorite: bool = False
     has_pitch: bool = False
-    # LinkedIn fields
-    author_name: Optional[str] = None
-    author_profile: Optional[str] = None
-    post_text: Optional[str] = None
-    post_url: Optional[str] = None
-    intent_score: Optional[float] = None
-    intent_reason: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
@@ -74,14 +67,6 @@ class LeadDetail(BaseModel):
     user_status: str = "new"
     user_notes: Optional[str] = ""
     is_favorite: bool = False
-    # LinkedIn fields
-    author_name: Optional[str] = None
-    author_profile: Optional[str] = None
-    post_text: Optional[str] = None
-    post_url: Optional[str] = None
-    intent_score: Optional[float] = None
-    intent_reason: Optional[str] = None
-    linkedin_keyword: Optional[str] = None
     created_at: Optional[datetime] = None
     website_analyses: list[WebsiteAnalysis] = []
 

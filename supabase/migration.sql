@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS public.searches (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     niche TEXT NOT NULL,
     location TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source IN ('google_maps', 'linkedin')),
+    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source = 'google_maps'),
     status TEXT NOT NULL DEFAULT 'queued'
         CHECK (status IN ('queued', 'scraping', 'analyzing', 'completed', 'failed', 'cancelled')),
     progress_percent INTEGER DEFAULT 0 CHECK (progress_percent >= 0 AND progress_percent <= 100),
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS public.leads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     search_id UUID NOT NULL REFERENCES public.searches(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source IN ('google_maps', 'linkedin')),
+    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source = 'google_maps'),
     -- Google Maps fields
     google_key TEXT DEFAULT '',
     business_name TEXT NOT NULL,
@@ -112,14 +112,6 @@ CREATE TABLE IF NOT EXISTS public.leads (
     photos JSONB DEFAULT '[]'::jsonb,
     business_hours JSONB DEFAULT '{}'::jsonb,
     description TEXT DEFAULT '',
-    -- LinkedIn fields
-    author_name TEXT DEFAULT '',
-    author_profile TEXT DEFAULT '',
-    post_text TEXT DEFAULT '',
-    post_url TEXT DEFAULT '',
-    intent_score DOUBLE PRECISION CHECK (intent_score IS NULL OR (intent_score >= 0 AND intent_score <= 1)),
-    intent_reason TEXT DEFAULT '',
-    linkedin_keyword TEXT DEFAULT '',
     -- Shared fields
     lead_category TEXT DEFAULT 'warm' CHECK (lead_category IN ('hot', 'warm')),
     website_health_score INTEGER CHECK (website_health_score IS NULL OR (website_health_score >= 0 AND website_health_score <= 100)),
@@ -137,16 +129,9 @@ CREATE INDEX IF NOT EXISTS idx_leads_user_id ON public.leads(user_id);
 CREATE INDEX IF NOT EXISTS idx_leads_lead_category ON public.leads(lead_category);
 CREATE INDEX IF NOT EXISTS idx_leads_user_status ON public.leads(user_status);
 CREATE INDEX IF NOT EXISTS idx_leads_is_favorite ON public.leads(is_favorite);
--- Add source + LinkedIn columns if table already existed
-ALTER TABLE public.searches ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps' CHECK (source IN ('google_maps', 'linkedin'));
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps' CHECK (source IN ('google_maps', 'linkedin'));
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS author_name TEXT DEFAULT '';
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS author_profile TEXT DEFAULT '';
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS post_text TEXT DEFAULT '';
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS post_url TEXT DEFAULT '';
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS intent_score DOUBLE PRECISION CHECK (intent_score IS NULL OR (intent_score >= 0 AND intent_score <= 1));
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS intent_reason TEXT DEFAULT '';
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS linkedin_keyword TEXT DEFAULT '';
+-- Add source column if table already existed
+ALTER TABLE public.searches ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps' CHECK (source = 'google_maps');
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps' CHECK (source = 'google_maps');
 
 CREATE INDEX IF NOT EXISTS idx_leads_business_name ON public.leads USING gin(business_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON public.leads(created_at DESC);

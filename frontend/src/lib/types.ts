@@ -70,14 +70,6 @@ export interface LeadListItem {
   is_favorite: boolean;
   has_pitch: boolean;
   created_at?: string;
-  // LinkedIn fields
-  author_name?: string;
-  author_profile?: string;
-  post_text?: string;
-  post_url?: string;
-  intent_score?: number;
-  intent_reason?: string;
-  linkedin_keyword?: string;
 }
 
 export interface LeadDetail {
@@ -103,14 +95,6 @@ export interface LeadDetail {
   is_favorite: boolean;
   created_at?: string;
   website_analyses?: unknown[];
-  // LinkedIn fields
-  author_name?: string;
-  author_profile?: string;
-  post_text?: string;
-  post_url?: string;
-  intent_score?: number;
-  intent_reason?: string;
-  linkedin_keyword?: string;
 }
 
 export interface LeadPaginatedResponse {

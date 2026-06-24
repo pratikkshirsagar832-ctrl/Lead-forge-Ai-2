@@ -3,7 +3,7 @@ Hyperclients — Search Pipeline
 
 Orchestrates the full search lifecycle:
   1. Initialize search row
-  2. Run Google Maps or LinkedIn scraper (based on source)
+   2. Run Google Maps scraper
   3. Parse + save leads
   4. Finalize counts
 """
@@ -15,7 +15,6 @@ from datetime import date, datetime, timezone
 
 from app.database import get_supabase_admin
 from app.services.scraper_service import run_maps_scraper
-from app.services.linkedin_scraper_service import LinkedInSearchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +22,6 @@ _search_semaphore = asyncio.Semaphore(3)
 _active_searches: dict[str, bool] = {}
 MAX_SEARCH_TIME_SECONDS = 600
 MAX_RESULTS = 25
-
-
-def _get_linkedin_engine(user_id: str) -> LinkedInSearchEngine:
-    return LinkedInSearchEngine(user_id=user_id)
 
 
 def is_search_cancelled(search_id: str) -> bool:
@@ -42,9 +37,6 @@ async def run_search_pipeline(
     user_id: str,
     niche: str,
     location: str,
-    source: str = "google_maps",
-    lead_type: str = "all",
-    time_filter: str = "latest",
 ) -> None:
     supabase = get_supabase_admin()
     start_time = time.time()
@@ -55,17 +47,14 @@ async def run_search_pipeline(
             await _update_search(supabase, search_id, {
                 "status": "scraping",
                 "progress_percent": 5,
-                "message": f"Starting {source} search...",
+                "message": f"Starting search...",
             })
 
             if is_search_cancelled(search_id):
                 await _mark_cancelled(supabase, search_id)
                 return
 
-            if source == "linkedin":
-                await _run_linkedin_search(supabase, search_id, user_id, niche, lead_type=lead_type, time_filter=time_filter)
-            else:
-                await _run_maps_search(supabase, search_id, user_id, niche, location, start_time)
+            await _run_maps_search(supabase, search_id, user_id, niche, location, start_time)
 
             await _finalize_search(supabase, search_id)
 
@@ -80,68 +69,6 @@ async def run_search_pipeline(
             logger.error(f"[Pipeline:{search_id}] Failed to update search status after error: {update_err}")
     finally:
         _active_searches.pop(search_id, None)
-
-
-async def load_more_linkedin_search(
-    search_id: str,
-    user_id: str,
-    keyword: str,
-) -> int:
-    """Load 10 more LinkedIn leads by scraping additional queries."""
-    supabase = get_supabase_admin()
-    engine = _get_linkedin_engine(user_id)
-
-    existing = await asyncio.to_thread(
-        lambda: supabase.table("leads")
-        .select("author_name")
-        .eq("search_id", search_id)
-        .execute()
-    )
-    existing_authors: set[str] = set()
-    for row in existing.data or []:
-        name = (row.get("author_name") or "").strip().lower()
-        if name:
-            existing_authors.add(name)
-
-    if not await engine.verify_session():
-        logger.info(f"[Pipeline:{search_id}] LinkedIn session invalid — load-more skipped")
-        return 0
-
-    queries = await engine.generate_queries(keyword, "all")
-    new_leads: list[dict] = []
-    TIME_FILTERS = ["latest", "7_days", "14_days", "27_days", "2_months"]
-
-    for query in queries[:5]:
-        if len(new_leads) >= 10:
-            break
-        for tf in TIME_FILTERS:
-            if len(new_leads) >= 10:
-                break
-            raw = await engine.scrape_query(query, tf)
-            if raw is None:
-                return 0
-            if not raw:
-                continue
-            leads = await engine.ai_extract(raw, query, "all")
-            for lead in leads:
-                author = lead.get("author_name", "").strip().lower()
-                if author and author in existing_authors:
-                    continue
-                if author:
-                    existing_authors.add(author)
-                lead["keyword"] = query
-                new_leads.append(lead)
-                if len(new_leads) >= 10:
-                    break
-
-    if not new_leads:
-        logger.info(f"[Pipeline:{search_id}] No new unique LinkedIn leads found for load-more")
-        return 0
-
-    saved_ids = await engine.save_leads(search_id, user_id, new_leads)
-    logger.info(f"[Pipeline:{search_id}] Load-more saved {len(saved_ids)} new LinkedIn leads")
-    await _finalize_search(supabase, search_id)
-    return len(saved_ids)
 
 
 async def load_more_maps_search(
@@ -247,62 +174,6 @@ async def _run_maps_search(
 
     lead_ids = await _save_maps_leads(supabase, search_id, user_id, raw_results)
     logger.info(f"[Pipeline:{search_id}] Saved {len(lead_ids)} maps leads")
-
-
-async def _run_linkedin_search(
-    supabase, search_id: str, user_id: str, keyword: str, lead_type: str = "all", time_filter: str = "latest"
-) -> None:
-    engine = _get_linkedin_engine(user_id)
-
-    await _update_search(supabase, search_id, {
-        "progress_percent": 10,
-        "message": f"Generating LinkedIn search queries for '{keyword}'...",
-    })
-
-    try:
-        result = await engine.start_search(keyword, time_filter, lead_type)
-
-        if result.get("session_valid") is False:
-            msg = "LinkedIn cookies not found. Import your LinkedIn cookies from browser → paste them in Settings."
-            if result.get("timeout"):
-                msg = "LinkedIn search timed out. Try fewer queries or check network."
-            await _update_search(supabase, search_id, {
-                "status": "failed",
-                "message": msg,
-                "error_message": "LinkedIn session expired",
-                "progress_percent": 0,
-            })
-            return
-
-        all_leads = result.get("all_leads", [])
-        if not all_leads:
-            await _update_search(supabase, search_id, {
-                "status": "completed", "progress_percent": 100,
-                "message": "No leads found on LinkedIn. Try a different keyword or re-import your LinkedIn session cookies.",
-                "total_results": 0,
-                "completed_at": datetime.now(timezone.utc).isoformat(),
-            })
-            return
-
-        await _update_search(supabase, search_id, {
-            "progress_percent": 60,
-            "message": f"Found {len(all_leads)} qualified leads. Saving...",
-        })
-
-        if is_search_cancelled(search_id):
-            await _mark_cancelled(supabase, search_id)
-            return
-
-        saved_ids = await engine.save_leads(search_id, user_id, all_leads)
-        logger.info(f"[Pipeline:{search_id}] Saved {len(saved_ids)} LinkedIn leads")
-    except Exception as e:
-        logger.error(f"[Pipeline:{search_id}] LinkedIn search failed: {e}")
-        await _update_search(supabase, search_id, {
-            "status": "failed",
-            "message": "LinkedIn search failed",
-            "error_message": str(e),
-            "progress_percent": 0,
-        })
 
 
 async def _save_maps_leads(

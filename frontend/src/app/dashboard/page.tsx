@@ -29,7 +29,7 @@ export default function DashboardOverview() {
                 Ready to find more clients?
               </h2>
               <p className="text-ice/70 mb-8 max-w-md leading-relaxed">
-                Start a new search to find leads on Google Maps and LinkedIn, analyze websites, and identify your hottest prospects in minutes.
+                Start a new search to find leads on Google Maps, analyze websites, and identify your hottest prospects in minutes.
               </p>
               <Link
                 href="/dashboard/search"

@@ -15,9 +15,7 @@ class SearchCreateRequest(BaseModel):
     """Request body for creating a new search."""
     niche: str = Field(..., min_length=1, max_length=200, description="Business niche or keyword to search")
     location: str = Field("", max_length=300, description="Geographic location (only for google_maps)")
-    source: Literal["google_maps", "linkedin"] = Field("google_maps", description="Source type")
-    lead_type: str = Field("all", description="LinkedIn lead type filter: all, intern, agency, company, one_client")
-    time_filter: str = Field("latest", description="LinkedIn time filter: latest, 7_days, 14_days, 27_days, 2_months")
+    source: Literal["google_maps"] = Field("google_maps", description="Source type")
 
 
 class SearchResponse(BaseModel):

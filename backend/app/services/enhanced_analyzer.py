@@ -35,7 +35,7 @@ SOCIAL_DOMAINS = {
     "facebook": ["facebook.com", "fb.com", "fb.me"],
     "twitter": ["twitter.com", "x.com"],
     "instagram": ["instagram.com"],
-    "linkedin": ["linkedin.com"],
+
     "youtube": ["youtube.com", "youtu.be"],
     "tiktok": ["tiktok.com"],
     "pinterest": ["pinterest.com", "pinterest.co.uk"],
