@@ -47,16 +47,6 @@ async def create_search(
     query_term = request.niche.strip()
     location_term = request.location.strip()
 
-    search_data = {
-        "user_id": user_id,
-        "niche": query_term,
-        "location": location_term,
-        "source": "google_maps",
-        "status": "queued",
-        "progress_percent": 0,
-        "message": "Search queued",
-    }
-
     # Increment usage synchronously BEFORE creating search
     try:
         supabase.rpc("increment_daily_usage", {
@@ -84,8 +74,12 @@ async def create_search(
             raise HTTPException(status_code=500, detail=f"Failed to record usage: {str(fallback_err)}")
 
     try:
-        response = supabase.table("searches").insert(search_data).execute()
-        if not response.data:
+        response = supabase.rpc("create_search", {
+            "p_user_id": user_id,
+            "p_niche": query_term,
+            "p_location": location_term,
+        }).execute()
+        if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=500, detail="Failed to create search")
         search = response.data[0]
     except HTTPException:

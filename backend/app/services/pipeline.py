@@ -227,9 +227,9 @@ async def _save_maps_leads(
                 "lead_category": "warm" if has_website else "hot",
             }
             response = await asyncio.to_thread(
-                lambda: supabase.table("leads").insert(lead_data).execute()
+                lambda: supabase.rpc("save_lead", {"p_data": lead_data}).execute()
             )
-            if response.data:
+            if response.data and len(response.data) > 0:
                 lead_ids.append(response.data[0]["id"])
                 remaining_leads -= 1  # decrement local counter after successful save
         except Exception as e:

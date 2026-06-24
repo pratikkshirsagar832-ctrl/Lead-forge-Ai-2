@@ -316,7 +316,84 @@ END;
 $$;
 
 -- ═══════════════════════════════════════════════════════════════
--- 15. FUNCTION: dashboard stats
+-- 15a. FUNCTION: create a search (SECURITY DEFINER to bypass RLS)
+-- ═══════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.create_search(
+    p_user_id UUID,
+    p_niche TEXT,
+    p_location TEXT
+) RETURNS SETOF searches
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    INSERT INTO public.searches (user_id, niche, location, source, status, progress_percent, message)
+    VALUES (p_user_id, p_niche, p_location, 'google_maps', 'queued', 0, 'Search queued')
+    RETURNING *;
+END;
+$$;
+
+-- ═══════════════════════════════════════════════════════════════
+-- 15b. FUNCTION: save a lead (SECURITY DEFINER to bypass RLS)
+-- ═══════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.save_lead(p_data JSONB)
+RETURNS SETOF leads
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    INSERT INTO public.leads (
+        search_id, user_id, google_key, business_name, category,
+        full_address, phone, email_found, website_url, rating,
+        total_reviews, google_maps_link, photos, business_hours,
+        description, lead_category
+    ) VALUES (
+        (p_data->>'search_id')::UUID,
+        (p_data->>'user_id')::UUID,
+        COALESCE(p_data->>'google_key', ''),
+        COALESCE(p_data->>'business_name', 'Unknown'),
+        COALESCE(p_data->>'category', ''),
+        COALESCE(p_data->>'full_address', ''),
+        COALESCE(p_data->>'phone', ''),
+        COALESCE(p_data->>'email_found', ''),
+        COALESCE(p_data->>'website_url', ''),
+        (p_data->>'rating')::DOUBLE PRECISION,
+        COALESCE((p_data->>'total_reviews')::INTEGER, 0),
+        COALESCE(p_data->>'google_maps_link', ''),
+        COALESCE(p_data->'photos', '[]'::jsonb),
+        COALESCE(p_data->'business_hours', '{}'::jsonb),
+        COALESCE(p_data->>'description', ''),
+        COALESCE(p_data->>'lead_category', 'warm')
+    )
+    RETURNING *;
+END;
+$$;
+
+-- ═══════════════════════════════════════════════════════════════
+-- 15c. FUNCTION: upsert daily usage (SECURITY DEFINER to bypass RLS)
+-- ═══════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.upsert_daily_usage(
+    p_user_id UUID,
+    p_date DATE DEFAULT CURRENT_DATE,
+    p_searches INTEGER DEFAULT 0,
+    p_leads INTEGER DEFAULT 0,
+    p_ai_calls INTEGER DEFAULT 0
+) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+    INSERT INTO daily_usage (user_id, date, leads_generated, searches_run, ai_calls)
+    VALUES (p_user_id, p_date, p_leads, p_searches, p_ai_calls)
+    ON CONFLICT (user_id, date)
+    DO UPDATE SET
+        leads_generated = daily_usage.leads_generated + p_leads,
+        searches_run = daily_usage.searches_run + p_searches,
+        ai_calls = daily_usage.ai_calls + p_ai_calls;
+END;
+$$;
+
+-- ═══════════════════════════════════════════════════════════════
+-- 16. FUNCTION: dashboard stats
 -- ═══════════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.get_dashboard_stats(p_user_id UUID)
 RETURNS JSON
