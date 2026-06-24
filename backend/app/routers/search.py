@@ -259,6 +259,7 @@ async def get_search_status(
             .execute()
         )
         if not response.data or len(response.data) == 0:
+            logger.warning(f"Status 404: search={search_id} user={current_user['id']} resp={response}")
             raise HTTPException(status_code=404, detail="Search not found")
             
         row = response.data[0]
