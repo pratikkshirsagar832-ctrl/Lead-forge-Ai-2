@@ -10,6 +10,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -208,10 +209,13 @@ function KanbanColumn({
   leads: LeadListItem[];
   activeId: string | null;
 }) {
-  const isOver = false;
+  const { setNodeRef, isOver } = useDroppable({
+    id: stage.key,
+  });
 
   return (
     <div
+      ref={setNodeRef}
       className={cn(
         'flex flex-col rounded-2xl border border-steel/15 bg-gradient-to-b from-sapphire/20 to-navy/50 min-h-[400px] transition-all duration-200',
         isOver && 'border-steel/40 shadow-lg'
