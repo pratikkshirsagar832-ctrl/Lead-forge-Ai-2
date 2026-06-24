@@ -38,15 +38,12 @@ async def list_plans():
             headers = {
                 "apikey": settings.supabase_service_role_key,
                 "Authorization": f"Bearer {settings.supabase_service_role_key}",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             }
             url = f"{settings.supabase_url}/rest/v1/plans?select=*"
             response = await client.get(url, headers=headers)
-            logger.info(f"Plans response: status={response.status_code}, headers={dict(response.headers)}, text_len={len(response.text)}, content_len={len(response.content)}")
-            logger.info(f"Plans text: {response.text[:300]}")
-            logger.info(f"Plans content: {response.content[:300]}")
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"Plans json: {data}")
                 return {"plans": data or []}
             else:
                 logger.error(f"Plans API error: {response.text[:500]}")
