@@ -222,7 +222,7 @@ async def get_search_results(
 
         response = (
             supabase.table("leads")
-            .select("id, source, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite")
+            .select("id, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite")
             .eq("search_id", search_id)
             .eq("user_id", current_user["id"])
             .order("created_at", desc=False)
