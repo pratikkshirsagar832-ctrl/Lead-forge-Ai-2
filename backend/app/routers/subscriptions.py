@@ -31,10 +31,26 @@ def _get_razorpay_client(settings):
 
 @router.get("/plans")
 async def list_plans():
-    supabase = get_supabase_admin()
+    import httpx
+    settings = get_settings()
     try:
-        resp = supabase.table("plans").select("*").eq("is_active", True).order("sort_order").execute()
-        return {"plans": resp.data or []}
+        async with httpx.AsyncClient() as client:
+            headers = {
+                "apikey": settings.supabase_service_role_key,
+                "Authorization": f"Bearer {settings.supabase_service_role_key}",
+            }
+            # Try with just select=*
+            url = f"{settings.supabase_url}/rest/v1/plans?select=*"
+            logger.info(f"Plans URL: {url}")
+            response = await client.get(url, headers=headers)
+            logger.info(f"Plans raw response: status={response.status_code}, body={response.text[:500]}")
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Plans parsed data: {data}")
+                return {"plans": data or []}
+            else:
+                logger.error(f"Plans API error: {response.text}")
+                return {"plans": []}
     except Exception as e:
         logger.error(f"Failed to fetch plans: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch plans")

@@ -186,11 +186,12 @@ async def get_search_detail(
             supabase.table("searches")
             .select("*")
             .eq("id", search_id)
-            .eq("user_id", current_user["id"])
             .limit(1)
             .execute()
         )
         if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Search not found")
+        if response.data[0].get("user_id") != current_user["id"]:
             raise HTTPException(status_code=404, detail="Search not found")
         return response.data[0]
     except HTTPException:
@@ -211,11 +212,16 @@ async def get_search_results(
     offset = (page - 1) * per_page
 
     try:
+        search_owner = supabase.table("searches").select("user_id").eq("id", search_id).limit(1).execute()
+        if not search_owner.data or len(search_owner.data) == 0:
+            raise HTTPException(status_code=404, detail="Search not found")
+        if search_owner.data[0].get("user_id") != current_user["id"]:
+            raise HTTPException(status_code=404, detail="Search not found")
+
         count_resp = (
             supabase.table("leads")
             .select("id", count="exact")
             .eq("search_id", search_id)
-            .eq("user_id", current_user["id"])
             .execute()
         )
         total = count_resp.count or 0
@@ -224,7 +230,6 @@ async def get_search_results(
             supabase.table("leads")
             .select("id, business_name, category, full_address, phone, website_url, rating, total_reviews, lead_category, website_health_score, user_status, is_favorite")
             .eq("search_id", search_id)
-            .eq("user_id", current_user["id"])
             .order("created_at", desc=False)
             .range(offset, offset + per_page - 1)
             .execute()
@@ -252,14 +257,16 @@ async def get_search_status(
     try:
         response = (
             supabase.table("searches")
-            .select("id, status, progress_percent, message, total_results, hot_leads, warm_leads, skipped, error_message, created_at, completed_at")
+            .select("id, user_id, status, progress_percent, message, total_results, hot_leads, warm_leads, skipped, error_message, created_at, completed_at")
             .eq("id", search_id)
-            .eq("user_id", current_user["id"])
             .limit(1)
             .execute()
         )
         if not response.data or len(response.data) == 0:
             logger.warning(f"Status 404: search={search_id} user={current_user['id']} resp={response}")
+            raise HTTPException(status_code=404, detail="Search not found")
+        if response.data[0].get("user_id") != current_user["id"]:
+            logger.warning(f"Status 403: search={search_id} owner={response.data[0].get('user_id')} requester={current_user['id']}")
             raise HTTPException(status_code=404, detail="Search not found")
             
         row = response.data[0]
@@ -314,16 +321,17 @@ async def cancel_search_endpoint(
     supabase = get_supabase_admin()
 
     try:
-        # Verify ownership and that search is running
+        # Verify search exists
         response = (
             supabase.table("searches")
-            .select("id, status")
+            .select("id, status, user_id")
             .eq("id", search_id)
-            .eq("user_id", current_user["id"])
             .limit(1)
             .execute()
         )
         if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Search not found")
+        if response.data[0].get("user_id") != current_user["id"]:
             raise HTTPException(status_code=404, detail="Search not found")
 
         search = response.data[0]
@@ -360,13 +368,14 @@ async def load_more_results(
     try:
         response = (
             supabase.table("searches")
-            .select("id, niche, location, source, status, total_results")
+            .select("id, niche, location, source, status, total_results, user_id")
             .eq("id", search_id)
-            .eq("user_id", current_user["id"])
             .limit(1)
             .execute()
         )
         if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Search not found")
+        if response.data[0].get("user_id") != current_user["id"]:
             raise HTTPException(status_code=404, detail="Search not found")
 
         search = response.data[0]
