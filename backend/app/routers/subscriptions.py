@@ -39,17 +39,17 @@ async def list_plans():
                 "apikey": settings.supabase_service_role_key,
                 "Authorization": f"Bearer {settings.supabase_service_role_key}",
             }
-            # Try with just select=*
             url = f"{settings.supabase_url}/rest/v1/plans?select=*"
-            logger.info(f"Plans URL: {url}")
             response = await client.get(url, headers=headers)
-            logger.info(f"Plans raw response: status={response.status_code}, body={response.text[:500]}")
+            logger.info(f"Plans response: status={response.status_code}, headers={dict(response.headers)}, text_len={len(response.text)}, content_len={len(response.content)}")
+            logger.info(f"Plans text: {response.text[:300]}")
+            logger.info(f"Plans content: {response.content[:300]}")
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"Plans parsed data: {data}")
+                logger.info(f"Plans json: {data}")
                 return {"plans": data or []}
             else:
-                logger.error(f"Plans API error: {response.text}")
+                logger.error(f"Plans API error: {response.text[:500]}")
                 return {"plans": []}
     except Exception as e:
         logger.error(f"Failed to fetch plans: {e}")
