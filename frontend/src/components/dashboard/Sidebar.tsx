@@ -23,6 +23,7 @@ import {
   Sparkles,
   ArrowUpRight,
   Bot,
+  Kanban,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -31,6 +32,7 @@ const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'New Search', href: '/dashboard/search', icon: Search },
   { name: 'Leads', href: '/dashboard/leads', icon: Users },
+  { name: 'Pipeline', href: '/dashboard/pipeline', icon: Kanban },
   { name: 'History', href: '/dashboard/history', icon: History },
   { name: 'Export', href: '/dashboard/export', icon: Download },
   { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
