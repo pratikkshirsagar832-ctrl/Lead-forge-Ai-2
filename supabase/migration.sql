@@ -1,8 +1,15 @@
--- Hyperclients — Complete Schema Migration
--- Run this in Supabase SQL Editor (https://supabase.com/dashboard/project/wtradahkkpbkbhmkkpal/sql/new)
+-- ═══════════════════════════════════════════════════════════════
+-- HYPERCLIENTS — COMPLETE SCHEMA MIGRATION (includes Hyper Agent)
+-- Run this in Supabase SQL Editor
+-- ═══════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════
--- 1. PLANS (reference lookup, static data)
+-- 1. EXTENSION
+-- ═══════════════════════════════════════════════════════════════
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- ═══════════════════════════════════════════════════════════════
+-- 2. PLANS (reference lookup, static data)
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.plans (
     id TEXT PRIMARY KEY,
@@ -24,7 +31,7 @@ INSERT INTO public.plans (id, name, description, leads_per_day, searches_per_day
 ON CONFLICT (id) DO NOTHING;
 
 -- ═══════════════════════════════════════════════════════════════
--- 2. USER SUBSCRIPTIONS
+-- 3. USER SUBSCRIPTIONS
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.user_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,11 +53,10 @@ CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON public.user_subscri
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_plan_id ON public.user_subscriptions(plan_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON public.user_subscriptions(status);
 
--- Add payment_id column if table already existed without it
 ALTER TABLE public.user_subscriptions ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
 
 -- ═══════════════════════════════════════════════════════════════
--- 3. DAILY USAGE TRACKING
+-- 4. DAILY USAGE TRACKING
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.daily_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,14 +71,14 @@ CREATE TABLE IF NOT EXISTS public.daily_usage (
 CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON public.daily_usage(user_id, date);
 
 -- ═══════════════════════════════════════════════════════════════
--- 4. SEARCHES (pipeline runs)
+-- 5. SEARCHES
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.searches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     niche TEXT NOT NULL,
     location TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source = 'google_maps'),
+    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source IN ('google_maps', 'hyper_agent')),
     status TEXT NOT NULL DEFAULT 'queued'
         CHECK (status IN ('queued', 'scraping', 'analyzing', 'completed', 'failed', 'cancelled')),
     progress_percent INTEGER DEFAULT 0 CHECK (progress_percent >= 0 AND progress_percent <= 100),
@@ -90,15 +96,16 @@ CREATE INDEX IF NOT EXISTS idx_searches_user_id ON public.searches(user_id);
 CREATE INDEX IF NOT EXISTS idx_searches_status ON public.searches(status);
 CREATE INDEX IF NOT EXISTS idx_searches_created_at ON public.searches(created_at DESC);
 
+ALTER TABLE public.searches ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps';
+
 -- ═══════════════════════════════════════════════════════════════
--- 5. LEADS
+-- 6. LEADS
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.leads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     search_id UUID NOT NULL REFERENCES public.searches(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source = 'google_maps'),
-    -- Google Maps fields
+    source TEXT NOT NULL DEFAULT 'google_maps' CHECK (source IN ('google_maps', 'hyper_agent')),
     google_key TEXT DEFAULT '',
     business_name TEXT NOT NULL,
     category TEXT DEFAULT '',
@@ -112,7 +119,6 @@ CREATE TABLE IF NOT EXISTS public.leads (
     photos JSONB DEFAULT '[]'::jsonb,
     business_hours JSONB DEFAULT '{}'::jsonb,
     description TEXT DEFAULT '',
-    -- Shared fields
     lead_category TEXT DEFAULT 'warm' CHECK (lead_category IN ('hot', 'warm')),
     website_health_score INTEGER CHECK (website_health_score IS NULL OR (website_health_score >= 0 AND website_health_score <= 100)),
     ai_pitch TEXT,
@@ -129,15 +135,13 @@ CREATE INDEX IF NOT EXISTS idx_leads_user_id ON public.leads(user_id);
 CREATE INDEX IF NOT EXISTS idx_leads_lead_category ON public.leads(lead_category);
 CREATE INDEX IF NOT EXISTS idx_leads_user_status ON public.leads(user_status);
 CREATE INDEX IF NOT EXISTS idx_leads_is_favorite ON public.leads(is_favorite);
--- Add source column if table already existed
-ALTER TABLE public.searches ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps' CHECK (source = 'google_maps');
-ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps' CHECK (source = 'google_maps');
-
 CREATE INDEX IF NOT EXISTS idx_leads_business_name ON public.leads USING gin(business_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON public.leads(created_at DESC);
 
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'google_maps';
+
 -- ═══════════════════════════════════════════════════════════════
--- 6. WEBSITE ANALYSES
+-- 7. WEBSITE ANALYSES
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.website_analyses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -154,8 +158,103 @@ CREATE TABLE IF NOT EXISTS public.website_analyses (
 CREATE INDEX IF NOT EXISTS idx_website_analyses_lead_id ON public.website_analyses(lead_id);
 
 -- ═══════════════════════════════════════════════════════════════
--- 7. TRIGGER: auto-create subscription on user signup
+-- 8. HYPER CONVERSATIONS
 -- ═══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.hyper_conversations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT DEFAULT '',
+    intent TEXT DEFAULT '',
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'archived', 'completed')),
+    lead_count INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hyper_conversations_user_id ON public.hyper_conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_hyper_conversations_status ON public.hyper_conversations(status);
+CREATE INDEX IF NOT EXISTS idx_hyper_conversations_created_at ON public.hyper_conversations(created_at DESC);
+
+-- ═══════════════════════════════════════════════════════════════
+-- 9. HYPER MESSAGES
+-- ═══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.hyper_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id UUID NOT NULL REFERENCES public.hyper_conversations(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    content TEXT NOT NULL,
+    intent JSONB DEFAULT '{}'::jsonb,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hyper_messages_conversation_id ON public.hyper_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_hyper_messages_user_id ON public.hyper_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_hyper_messages_created_at ON public.hyper_messages(created_at);
+
+-- ═══════════════════════════════════════════════════════════════
+-- 10. HYPER CAMPAIGNS
+-- ═══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.hyper_campaigns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'paused', 'completed', 'archived')),
+    type TEXT DEFAULT 'email' CHECK (type IN ('email', 'sequence', 'multi-channel')),
+    target_count INTEGER DEFAULT 0,
+    sent_count INTEGER DEFAULT 0,
+    open_count INTEGER DEFAULT 0,
+    reply_count INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hyper_campaigns_user_id ON public.hyper_campaigns(user_id);
+CREATE INDEX IF NOT EXISTS idx_hyper_campaigns_status ON public.hyper_campaigns(status);
+CREATE INDEX IF NOT EXISTS idx_hyper_campaigns_created_at ON public.hyper_campaigns(created_at DESC);
+
+-- ═══════════════════════════════════════════════════════════════
+-- 11. HYPER VERIFICATION LOGS
+-- ═══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.hyper_verification_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('valid', 'invalid', 'risky', 'unknown')),
+    confidence DOUBLE PRECISION CHECK (confidence >= 0 AND confidence <= 1),
+    checks JSONB DEFAULT '{}'::jsonb,
+    duration_ms INTEGER,
+    source TEXT DEFAULT '',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hyper_verification_logs_user_id ON public.hyper_verification_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_hyper_verification_logs_status ON public.hyper_verification_logs(status);
+CREATE INDEX IF NOT EXISTS idx_hyper_verification_logs_created_at ON public.hyper_verification_logs(created_at DESC);
+
+-- ═══════════════════════════════════════════════════════════════
+-- 12. HYPER SETTINGS
+-- ═══════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.hyper_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    settings JSONB DEFAULT '{}'::jsonb NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hyper_settings_user_id ON public.hyper_settings(user_id);
+
+-- ═══════════════════════════════════════════════════════════════
+-- 13. TRIGGERS
+-- ═══════════════════════════════════════════════════════════════
+
+-- Auto-create subscription on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -176,9 +275,7 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- ═══════════════════════════════════════════════════════════════
--- 8. TRIGGER: auto-update subscription updated_at
--- ═══════════════════════════════════════════════════════════════
+-- Auto-update subscription updated_at
 CREATE OR REPLACE FUNCTION public.update_subscription_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -192,9 +289,49 @@ CREATE TRIGGER on_user_subscriptions_update
     BEFORE UPDATE ON public.user_subscriptions
     FOR EACH ROW EXECUTE FUNCTION public.update_subscription_timestamp();
 
--- ═══════════════════════════════════════════════════════════════
--- 9. TRIGGER: increment daily_usage.leads_generated on lead insert
--- ═══════════════════════════════════════════════════════════════
+-- Auto-update hyper_conversations updated_at
+CREATE OR REPLACE FUNCTION public.update_hyper_conversations_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_hyper_conversations_update ON public.hyper_conversations;
+CREATE TRIGGER on_hyper_conversations_update
+    BEFORE UPDATE ON public.hyper_conversations
+    FOR EACH ROW EXECUTE FUNCTION public.update_hyper_conversations_timestamp();
+
+-- Auto-update hyper_campaigns updated_at
+CREATE OR REPLACE FUNCTION public.update_hyper_campaigns_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_hyper_campaigns_update ON public.hyper_campaigns;
+CREATE TRIGGER on_hyper_campaigns_update
+    BEFORE UPDATE ON public.hyper_campaigns
+    FOR EACH ROW EXECUTE FUNCTION public.update_hyper_campaigns_timestamp();
+
+-- Auto-update hyper_settings updated_at
+CREATE OR REPLACE FUNCTION public.update_hyper_settings_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_hyper_settings_update ON public.hyper_settings;
+CREATE TRIGGER on_hyper_settings_update
+    BEFORE UPDATE ON public.hyper_settings
+    FOR EACH ROW EXECUTE FUNCTION public.update_hyper_settings_timestamp();
+
+-- Increment daily_usage.leads_generated on lead insert
 CREATE OR REPLACE FUNCTION public.handle_lead_insert()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -212,7 +349,7 @@ CREATE TRIGGER on_lead_insert
     FOR EACH ROW EXECUTE FUNCTION public.handle_lead_insert();
 
 -- ═══════════════════════════════════════════════════════════════
--- 10. SYNC: ensure all existing users have subscriptions
+-- 14. SYNC: ensure all existing users have subscriptions
 -- ═══════════════════════════════════════════════════════════════
 INSERT INTO public.user_subscriptions (user_id, plan_id, status, trial_end, current_period_end)
 SELECT id, 'free', 'trial', NOW() + INTERVAL '3 days', NOW() + INTERVAL '3 days'
@@ -221,8 +358,10 @@ WHERE id NOT IN (SELECT user_id FROM public.user_subscriptions)
 ON CONFLICT DO NOTHING;
 
 -- ═══════════════════════════════════════════════════════════════
--- 11. FUNCTION: get remaining searches today
+-- 15. FUNCTIONS
 -- ═══════════════════════════════════════════════════════════════
+
+-- Get remaining searches today
 CREATE OR REPLACE FUNCTION public.get_remaining_searches(p_user_id UUID)
 RETURNS INTEGER
 LANGUAGE plpgsql STABLE
@@ -244,9 +383,7 @@ BEGIN
 END;
 $$;
 
--- ═══════════════════════════════════════════════════════════════
--- 12. FUNCTION: get remaining leads today
--- ═══════════════════════════════════════════════════════════════
+-- Get remaining leads today
 CREATE OR REPLACE FUNCTION public.get_remaining_leads(p_user_id UUID)
 RETURNS INTEGER
 LANGUAGE plpgsql STABLE
@@ -268,9 +405,7 @@ BEGIN
 END;
 $$;
 
--- ═══════════════════════════════════════════════════════════════
--- 13. FUNCTION: get subscription info (JSON)
--- ═══════════════════════════════════════════════════════════════
+-- Get subscription info (JSON)
 CREATE OR REPLACE FUNCTION public.get_user_subscription(p_user_id UUID)
 RETURNS JSON
 LANGUAGE plpgsql STABLE
@@ -301,9 +436,7 @@ BEGIN
 END;
 $$;
 
--- ═══════════════════════════════════════════════════════════════
--- 14. FUNCTION: increment daily usage
--- ═══════════════════════════════════════════════════════════════
+-- Increment daily usage
 CREATE OR REPLACE FUNCTION public.increment_daily_usage(
     p_user_id UUID,
     p_leads INTEGER DEFAULT 0,
@@ -323,9 +456,7 @@ BEGIN
 END;
 $$;
 
--- ═══════════════════════════════════════════════════════════════
--- 15. FUNCTION: dashboard stats
--- ═══════════════════════════════════════════════════════════════
+-- Dashboard stats
 CREATE OR REPLACE FUNCTION public.get_dashboard_stats(p_user_id UUID)
 RETURNS JSON
 LANGUAGE plpgsql STABLE
@@ -358,34 +489,38 @@ $$;
 -- 16. ROW LEVEL SECURITY
 -- ═══════════════════════════════════════════════════════════════
 
--- Enable RLS on all tables
 ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.searches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.website_analyses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hyper_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hyper_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hyper_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hyper_verification_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hyper_settings ENABLE ROW LEVEL SECURITY;
 
--- user_subscriptions: each user sees their own
+-- user_subscriptions
 DROP POLICY IF EXISTS user_subscriptions_isolation ON public.user_subscriptions;
 CREATE POLICY user_subscriptions_isolation ON public.user_subscriptions
     FOR ALL USING (user_id = auth.uid());
 
--- daily_usage: each user sees their own
+-- daily_usage
 DROP POLICY IF EXISTS daily_usage_isolation ON public.daily_usage;
 CREATE POLICY daily_usage_isolation ON public.daily_usage
     FOR ALL USING (user_id = auth.uid());
 
--- searches: each user sees their own
+-- searches
 DROP POLICY IF EXISTS searches_isolation ON public.searches;
 CREATE POLICY searches_isolation ON public.searches
     FOR ALL USING (user_id = auth.uid());
 
--- leads: each user sees their own
+-- leads
 DROP POLICY IF EXISTS leads_isolation ON public.leads;
 CREATE POLICY leads_isolation ON public.leads
     FOR ALL USING (user_id = auth.uid());
 
--- website_analyses: via joined lead ownership
+-- website_analyses
 DROP POLICY IF EXISTS website_analyses_isolation ON public.website_analyses;
 CREATE POLICY website_analyses_isolation ON public.website_analyses
     FOR ALL USING (
@@ -396,7 +531,27 @@ CREATE POLICY website_analyses_isolation ON public.website_analyses
         )
     );
 
--- ═══════════════════════════════════════════════════════════════
--- 17. ENABLE pg_trgm for ILIKE search on leads.business_name
--- ═══════════════════════════════════════════════════════════════
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- hyper_conversations
+DROP POLICY IF EXISTS hyper_conversations_isolation ON public.hyper_conversations;
+CREATE POLICY hyper_conversations_isolation ON public.hyper_conversations
+    FOR ALL USING (auth.uid() = user_id);
+
+-- hyper_messages
+DROP POLICY IF EXISTS hyper_messages_isolation ON public.hyper_messages;
+CREATE POLICY hyper_messages_isolation ON public.hyper_messages
+    FOR ALL USING (auth.uid() = user_id);
+
+-- hyper_campaigns
+DROP POLICY IF EXISTS hyper_campaigns_isolation ON public.hyper_campaigns;
+CREATE POLICY hyper_campaigns_isolation ON public.hyper_campaigns
+    FOR ALL USING (auth.uid() = user_id);
+
+-- hyper_verification_logs
+DROP POLICY IF EXISTS hyper_verification_logs_isolation ON public.hyper_verification_logs;
+CREATE POLICY hyper_verification_logs_isolation ON public.hyper_verification_logs
+    FOR ALL USING (auth.uid() = user_id);
+
+-- hyper_settings
+DROP POLICY IF EXISTS hyper_settings_isolation ON public.hyper_settings;
+CREATE POLICY hyper_settings_isolation ON public.hyper_settings
+    FOR ALL USING (auth.uid() = user_id);

@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { supabase } from '@/lib/supabase';
