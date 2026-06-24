@@ -2,17 +2,18 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, WifiOff } from 'lucide-react';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,11 +23,18 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
 
+  const authConfigError = searchParams.get('error') === 'auth_config';
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) router.replace('/dashboard');
     });
   }, [router]);
+
+  const enterGuestMode = () => {
+    localStorage.setItem('hyperclients_guest', 'true');
+    router.replace('/dashboard');
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,10 +188,42 @@ export default function LoginPage() {
           Google
         </LoadingButton>
 
+        {authConfigError && (
+          <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+            <div className="flex items-start gap-3">
+              <WifiOff className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-300">Auth service unavailable</p>
+                <p className="text-xs text-amber-400/70 mt-1 mb-3">
+                  Authentication service is temporarily down. Continue as guest to explore the dashboard.
+                </p>
+                <button
+                  onClick={enterGuestMode}
+                  className="text-sm font-bold text-offwhite bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-4 py-2 rounded-lg transition-all"
+                >
+                  Continue as Guest
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-center text-ice/40 mt-6">
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </p>
       </GlassCard>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-navy font-sans">
+        <Loader2 className="w-6 h-6 text-steel animate-spin" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

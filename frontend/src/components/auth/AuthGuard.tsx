@@ -5,6 +5,19 @@ import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 
+function isGuestSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('hyperclients_guest') === 'true';
+}
+
+function clearGuestSession() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('hyperclients_guest');
+  }
+}
+
+export { clearGuestSession };
+
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -25,6 +38,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const checkSession = async () => {
       try {
+        if (isGuestSession()) {
+          setIsAuthenticated(true);
+          setIsLoading(false);
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!mountedRef.current) return;
 
@@ -34,8 +53,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Session not found — wait a moment for onAuthStateChange to fire
-        // (avoids redirect loop when login just completed but session isn't persisted yet)
         redirectTimerRef.current = setTimeout(async () => {
           if (!mountedRef.current) return;
           try {
@@ -50,9 +67,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
           }
         }, 3000);
-      } catch (err) {
+      } catch (err: any) {
         console.error('AuthGuard: session check failed', err);
-        safeRedirect('/login');
+        if (err?.message?.includes('Invalid API key') || err?.status === 401) {
+          router.replace('/login?error=auth_config');
+        } else {
+          safeRedirect('/login');
+        }
       }
     };
 
@@ -62,6 +83,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       (event, session) => {
         if (!mountedRef.current) return;
         if (event === 'SIGNED_OUT') {
+          clearGuestSession();
           safeRedirect('/login');
         } else if (session) {
           if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
