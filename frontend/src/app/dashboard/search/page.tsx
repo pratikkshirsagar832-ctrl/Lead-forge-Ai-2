@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -69,6 +69,9 @@ function LiveResultCard({ lead, index }: { lead: any; index: number }) {
                 <span className="flex items-center gap-0.5">
                   <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                   {lead.rating}
+                  {lead.total_reviews > 0 && (
+                    <span className="text-[10px] text-ice/50">({lead.total_reviews})</span>
+                  )}
                 </span>
               )}
               {lead.category && <span className="text-ice/40">{lead.category}</span>}
@@ -117,6 +120,22 @@ export default function SearchPage() {
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<'all' | { min: number; max: number | null }>('all');
+
+  const REVIEW_RANGES = [
+    { key: 'all', label: 'All' },
+    { key: '0-5', label: '0–5 Reviews', min: 0, max: 5 },
+    { key: '5-30', label: '5–30 Reviews', min: 5, max: 30 },
+    { key: '30+', label: '30+ Reviews', min: 30, max: null },
+  ] as const;
+
+  const filteredResults = useMemo(() => {
+    if (reviewFilter === 'all') return results;
+    return results.filter(l =>
+      l.total_reviews >= reviewFilter.min &&
+      (reviewFilter.max === null || l.total_reviews <= reviewFilter.max)
+    );
+  }, [results, reviewFilter]);
 
   const mapsForm = useForm({ resolver: zodResolver(mapsSchema) });
 
@@ -256,11 +275,36 @@ export default function SearchPage() {
                   <h2 className="text-lg font-bold text-offwhite tracking-tight">Live Results</h2>
                 </div>
                 <span className="text-sm text-ice/40 font-mono">
-                  {results.length}{resultsTotal > results.length ? ' / ' + resultsTotal : ''} found
+                  {filteredResults.length}{resultsTotal > results.length ? ' / ' + resultsTotal : ''} found
                 </span>
               </div>
+
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {REVIEW_RANGES.map((range) => {
+                  const isActive = range.key === 'all'
+                    ? reviewFilter === 'all'
+                    : (reviewFilter !== 'all' && reviewFilter.min === range.min && reviewFilter.max === range.max);
+                  return (
+                    <button
+                      key={range.key}
+                      onClick={() => {
+                        if (range.key === 'all') setReviewFilter('all');
+                        else setReviewFilter({ min: range.min!, max: range.max ?? null });
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        isActive
+                          ? 'bg-steel/20 border-steel/50 text-offwhite'
+                          : 'bg-navy/60 border-ocean/25 text-ice/60 hover:text-offwhite hover:border-steel/40'
+                      }`}
+                    >
+                      {range.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {results.map((lead, idx) => (
+                {filteredResults.map((lead, idx) => (
                   <LiveResultCard key={lead.id} lead={lead} index={idx} />
                 ))}
               </div>
