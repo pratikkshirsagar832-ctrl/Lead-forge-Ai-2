@@ -40,6 +40,13 @@ export default function RootLayout({
               y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
             })(window, document, "clarity", "script", "xdko5ui3zm");`}
           </script>
+          <script async src="https://www.googletagmanager.com/gtag/js?id=G-RVV56NV108"></script>
+          <script>
+            {`window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-RVV56NV108');`}
+          </script>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
